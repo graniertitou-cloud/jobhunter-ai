@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+sqlalchemy
+requests
+beautifulsoup4
+python-dotenv
+openai
+lxml
+pdfplumber
+google-auth
+python-multipart

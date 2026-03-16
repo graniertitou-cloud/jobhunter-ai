@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "jobhunter",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "cd /Users/titougranier/Desktop/jobhunter-ai && python3 -m uvicorn main:app --reload --port 8000"],
+      "port": 8000
+    }
+  ]
+}
