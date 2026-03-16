@@ -1,10 +1,12 @@
 import asyncio
 import io
+import ipaddress
 import json
 import logging
 import os
 import random
 import re
+import secrets
 import smtplib
 import time
 import uuid
@@ -12,9 +14,9 @@ from datetime import datetime, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Optional
-from urllib.parse import quote, unquote
+from urllib.parse import quote, unquote, urlparse
 
-import hashlib
+import bcrypt
 
 import pdfplumber
 import requests
@@ -28,10 +30,15 @@ except ImportError:
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from openai import OpenAI
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
+from starlette.middleware.base import BaseHTTPMiddleware
 from sqlalchemy import (
     Boolean,
     Column,
@@ -77,6 +84,7 @@ class User(Base):
     password_hash = Column(String, nullable=False)
     name = Column(String, default="")
     session_token = Column(String, default="")
+    session_expires_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -215,12 +223,68 @@ try:
         if "dark_mode" not in existing_cols:
             conn.execute(text("ALTER TABLE profiles ADD COLUMN dark_mode BOOLEAN DEFAULT 0"))
         conn.commit()
+    # Migration for users table
+    existing_user_cols = [c["name"] for c in inspector.get_columns("users")]
+    with engine.connect() as conn:
+        if "session_expires_at" not in existing_user_cols:
+            conn.execute(text("ALTER TABLE users ADD COLUMN session_expires_at DATETIME"))
+        conn.commit()
     logger.info("Migration check done")
 except Exception as e:
     logger.warning(f"Migration check: {e}")
 
 # --- FastAPI ---
-app = FastAPI(title="JobHunter AI")
+docs_url = "/docs" if os.getenv("DEBUG") else None
+app = FastAPI(title="JobHunter AI", docs_url=docs_url, redoc_url=None)
+
+# --- Security Headers Middleware ---
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        return response
+
+app.add_middleware(SecurityHeadersMiddleware)
+
+# --- CORS ---
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PATCH", "DELETE"],
+    allow_headers=["Authorization", "Content-Type"],
+)
+
+# --- Rate Limiting ---
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# --- SSRF Protection ---
+BLOCKED_HOSTS = {"localhost", "127.0.0.1", "0.0.0.0", "169.254.169.254", "[::1]"}
+
+def validate_url(url: str) -> bool:
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            return False
+        hostname = parsed.hostname or ""
+        if hostname in BLOCKED_HOSTS:
+            return False
+        try:
+            ip = ipaddress.ip_address(hostname)
+            if ip.is_private or ip.is_loopback or ip.is_link_local:
+                return False
+        except ValueError:
+            pass
+        return True
+    except Exception:
+        return False
+
 os.makedirs("static", exist_ok=True)
 os.makedirs("uploads", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -313,6 +377,9 @@ def check_alerts():
 
 def _send_email(smtp_email: str, smtp_password: str, smtp_host: str, smtp_port: int, to_email: str, subject: str, body: str):
     """Send an email via SMTP. Raises on failure."""
+    # Sanitize headers against injection
+    subject = subject.replace("\n", "").replace("\r", "")
+    to_email = to_email.replace("\n", "").replace("\r", "")
     msg = MIMEMultipart()
     msg["From"] = smtp_email
     msg["To"] = to_email
@@ -394,6 +461,8 @@ def get_current_user(request: Request) -> Optional[User]:
     db = SessionLocal()
     try:
         user = db.query(User).filter(User.session_token == token).first()
+        if user and user.session_expires_at and user.session_expires_at < datetime.utcnow():
+            return None
         return user
     finally:
         db.close()
@@ -412,36 +481,53 @@ def serve_index():
 
 
 def hash_password(password: str) -> str:
-    return hashlib.sha256(password.encode()).hexdigest()
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+
+
+def verify_password(password: str, hashed: str) -> bool:
+    # Support legacy SHA-256 hashes (64 hex chars) for migration
+    if len(hashed) == 64 and all(c in '0123456789abcdef' for c in hashed):
+        import hashlib
+        if hashlib.sha256(password.encode()).hexdigest() == hashed:
+            return True
+        return False
+    try:
+        return bcrypt.checkpw(password.encode(), hashed.encode())
+    except Exception:
+        return False
 
 
 # --- Auth ---
 class RegisterRequest(BaseModel):
-    email: str
-    password: str
-    name: str = ""
+    email: str = Field(..., max_length=200)
+    password: str = Field(..., max_length=200)
+    name: str = Field("", max_length=200)
 
 
 class LoginRequest(BaseModel):
-    email: str
-    password: str
+    email: str = Field(..., max_length=200)
+    password: str = Field(..., max_length=200)
 
 
 @app.post("/api/auth/register")
-def register(req: RegisterRequest):
+@limiter.limit("3/minute")
+def register(req: RegisterRequest, request: Request):
     if not req.email or not req.password:
         raise HTTPException(400, "Email et mot de passe requis")
+    if len(req.password) < 8:
+        raise HTTPException(400, "Le mot de passe doit contenir au moins 8 caractères")
     db = SessionLocal()
     try:
         existing = db.query(User).filter(User.email == req.email).first()
         if existing:
             raise HTTPException(400, "Cet email est déjà utilisé")
-        session_token = str(uuid.uuid4())
+        session_token = secrets.token_urlsafe(32)
         user = User(
             email=req.email,
             password_hash=hash_password(req.password),
             name=req.name or req.email.split("@")[0],
             session_token=session_token,
+            session_expires_at=datetime.utcnow() + timedelta(hours=24),
         )
         db.add(user)
         db.commit()
@@ -458,16 +544,25 @@ def register(req: RegisterRequest):
 
 
 @app.post("/api/auth/login")
-def login(req: LoginRequest):
+@limiter.limit("5/minute")
+def login(req: LoginRequest, request: Request):
     if not req.email or not req.password:
         raise HTTPException(400, "Email et mot de passe requis")
+    dummy_hash = hash_password("dummy_password_for_timing")
     db = SessionLocal()
     try:
         user = db.query(User).filter(User.email == req.email).first()
-        if not user or user.password_hash != hash_password(req.password):
+        if not user:
+            verify_password(req.password, dummy_hash)  # constant time
             raise HTTPException(401, "Email ou mot de passe incorrect")
-        session_token = str(uuid.uuid4())
+        if not verify_password(req.password, user.password_hash):
+            raise HTTPException(401, "Email ou mot de passe incorrect")
+        # Auto-migrate legacy SHA-256 hash to bcrypt
+        if not user.password_hash.startswith("$2"):
+            user.password_hash = hash_password(req.password)
+        session_token = secrets.token_urlsafe(32)
         user.session_token = session_token
+        user.session_expires_at = datetime.utcnow() + timedelta(hours=24)
         db.commit()
         return {
             "token": session_token,
@@ -483,17 +578,34 @@ def get_me(request: Request):
     return {"name": user.name, "email": user.email}
 
 
+@app.post("/api/auth/logout")
+def logout(request: Request):
+    user = get_current_user(request)
+    if not user:
+        return {"status": "ok"}
+    db = SessionLocal()
+    try:
+        u = db.query(User).filter(User.id == user.id).first()
+        if u:
+            u.session_token = ""
+            u.session_expires_at = None
+            db.commit()
+        return {"status": "ok"}
+    finally:
+        db.close()
+
+
 # --- Profile ---
 class ProfileData(BaseModel):
-    cv: str = ""
-    cover_letter: str = ""
-    goals: str = ""
+    cv: str = Field("", max_length=50000)
+    cover_letter: str = Field("", max_length=50000)
+    goals: str = Field("", max_length=10000)
     cvs: list = []
     cover_letters: list = []
-    language: str = "fr"
-    smtp_email: str = ""
-    smtp_password: str = ""
-    smtp_host: str = "smtp.gmail.com"
+    language: str = Field("fr", max_length=10)
+    smtp_email: str = Field("", max_length=200)
+    smtp_password: str = Field("", max_length=200)
+    smtp_host: str = Field("smtp.gmail.com", max_length=200)
     smtp_port: int = 587
     dark_mode: bool = False
 
@@ -566,6 +678,7 @@ def get_profile(request: Request):
             "completion_score": score,
             "completion_message": completion_msg,
             "smtp_email": getattr(p, "smtp_email", "") or "",
+            "smtp_password": "********" if (getattr(p, "smtp_password", "") or "") else "",
             "smtp_host": getattr(p, "smtp_host", "smtp.gmail.com") or "smtp.gmail.com",
             "smtp_port": getattr(p, "smtp_port", 587) or 587,
             "dark_mode": bool(getattr(p, "dark_mode", False)),
@@ -626,6 +739,9 @@ async def upload_pdf(request: Request, file: UploadFile = File(...)):
     content = await file.read()
     if len(content) > 10 * 1024 * 1024:
         raise HTTPException(400, "Fichier trop volumineux (max 10 Mo).")
+
+    if not content.startswith(b'%PDF'):
+        raise HTTPException(400, "Le fichier n'est pas un PDF valide.")
 
     try:
         pdf_text = ""
@@ -1032,12 +1148,13 @@ Exemple: [{{"score": 7, "explanation": "Bon match pour vos compétences en gesti
 
 # --- Search ---
 class SearchRequest(BaseModel):
-    keywords: str
-    location: str = "France"
+    keywords: str = Field(..., max_length=500)
+    location: str = Field("France", max_length=200)
     platforms: list[str] = ["linkedin", "wttj", "francetravail"]
 
 
 @app.post("/api/search")
+@limiter.limit("10/minute")
 def search_jobs(req: SearchRequest, request: Request):
     user = require_user(request)
     db = SessionLocal()
@@ -1080,14 +1197,14 @@ def search_jobs(req: SearchRequest, request: Request):
 
 # --- Saved jobs ---
 class SaveJobRequest(BaseModel):
-    title: str
-    company: str = ""
-    location: str = ""
-    url: str = ""
-    platform: str = ""
-    date: str = ""
+    title: str = Field(..., max_length=500)
+    company: str = Field("", max_length=200)
+    location: str = Field("", max_length=200)
+    url: str = Field("", max_length=2000)
+    platform: str = Field("", max_length=200)
+    date: str = Field("", max_length=200)
     score: float = 0
-    explanation: str = ""
+    explanation: str = Field("", max_length=10000)
 
 
 @app.get("/api/jobs/saved")
@@ -1095,7 +1212,7 @@ def get_saved_jobs(request: Request):
     user = require_user(request)
     db = SessionLocal()
     try:
-        jobs = db.query(SavedJob).filter(SavedJob.user_id == user.id).order_by(SavedJob.score.desc()).all()
+        jobs = db.query(SavedJob).filter(SavedJob.user_id == user.id).order_by(SavedJob.score.desc()).limit(100).all()
         return [
             {"id": j.id, "title": j.title, "company": j.company, "location": j.location,
              "url": j.url, "platform": j.platform, "date": j.date, "score": j.score, "explanation": j.explanation}
@@ -1131,19 +1248,21 @@ def toggle_save_job(req: SaveJobRequest, request: Request):
 
 # --- Letters ---
 class LetterRequest(BaseModel):
-    job_title: str = ""
-    company: str = ""
-    job_description: str = ""
-    job_url: str = ""
-    job_location: str = ""
-    job_explanation: str = ""
-    instruction: str = ""
-    letter_language: str = "fr"  # "fr" or "en"
+    job_title: str = Field("", max_length=500)
+    company: str = Field("", max_length=200)
+    job_description: str = Field("", max_length=10000)
+    job_url: str = Field("", max_length=2000)
+    job_location: str = Field("", max_length=200)
+    job_explanation: str = Field("", max_length=10000)
+    instruction: str = Field("", max_length=500)
+    letter_language: str = Field("fr", max_length=10)
 
 
 def fetch_job_description(url: str) -> str:
     """Try to fetch the actual job description from the offer URL."""
     if not url or url == "#":
+        return ""
+    if not validate_url(url):
         return ""
     try:
         resp = requests.get(url, headers=HEADERS, timeout=10)
@@ -1176,6 +1295,7 @@ def fetch_job_description(url: str) -> str:
 
 
 @app.post("/api/letter")
+@limiter.limit("5/minute")
 def generate_letter(req: LetterRequest, request: Request):
     user = require_user(request)
     db = SessionLocal()
@@ -1212,6 +1332,8 @@ def generate_letter(req: LetterRequest, request: Request):
     # Try to fetch the actual job description from URL if not provided
     job_desc = req.job_description
     if not job_desc and req.job_url:
+        if not validate_url(req.job_url):
+            raise HTTPException(400, "URL non autorisée")
         logger.info(f"Fetching job description from URL: {req.job_url}")
         job_desc = fetch_job_description(req.job_url)
 
@@ -1268,7 +1390,7 @@ Fais des liens CONCRETS entre les expériences du CV et les exigences du poste.
         letter_content = resp.choices[0].message.content.strip()
     except Exception as e:
         logger.error(f"Groq letter error: {e}")
-        raise HTTPException(500, "Erreur lors de la génération de la lettre.")
+        raise HTTPException(500, "Erreur interne du serveur.")
 
     db = SessionLocal()
     try:
@@ -1337,10 +1459,11 @@ def get_stats(request: Request):
 
 # --- Chat ---
 class ChatRequest(BaseModel):
-    message: str
+    message: str = Field(..., max_length=10000)
 
 
 @app.post("/api/chat")
+@limiter.limit("20/minute")
 def chat(req: ChatRequest, request: Request):
     user = require_user(request)
     db = SessionLocal()
@@ -1378,14 +1501,14 @@ Tu aides le candidat dans sa recherche d'emploi.
         return {"response": resp.choices[0].message.content.strip()}
     except Exception as e:
         logger.error(f"Chat error: {e}")
-        raise HTTPException(500, "Erreur de l'assistant IA.")
+        raise HTTPException(500, "Erreur interne du serveur.")
 
 
 # --- People Search ---
 class PeopleSearchRequest(BaseModel):
     keywords: list = []       # list of up to 3 keyword strings
-    keyword: str = ""         # backward compat single keyword
-    location: str = ""
+    keyword: str = Field("", max_length=200)
+    location: str = Field("", max_length=200)
 
 
 def _parse_linkedin_title(title_text: str) -> dict:
@@ -1682,16 +1805,16 @@ def mark_alert_seen(alert_id: int, request: Request):
 
 # --- Application Tracker ---
 class ApplicationRequest(BaseModel):
-    job_title: str = ""
-    company: str = ""
-    url: str = ""
-    status: str = "sent"
-    notes: str = ""
+    job_title: str = Field("", max_length=500)
+    company: str = Field("", max_length=200)
+    url: str = Field("", max_length=2000)
+    status: str = Field("sent", max_length=50)
+    notes: str = Field("", max_length=10000)
 
 
 class ApplicationUpdate(BaseModel):
-    status: str = ""
-    notes: str = ""
+    status: str = Field("", max_length=50)
+    notes: str = Field("", max_length=10000)
 
 
 @app.post("/api/applications")
@@ -1729,7 +1852,7 @@ def list_applications(request: Request):
     user = require_user(request)
     db = SessionLocal()
     try:
-        apps = db.query(Application).filter(Application.user_id == user.id).order_by(Application.applied_at.desc()).all()
+        apps = db.query(Application).filter(Application.user_id == user.id).order_by(Application.applied_at.desc()).limit(100).all()
         return [
             {
                 "id": a.id,
@@ -1792,13 +1915,14 @@ def delete_application(app_id: int, request: Request):
 
 # --- CV Tailoring ---
 class CVTailorRequest(BaseModel):
-    job_url: str = ""
-    job_description: str = ""
-    job_title: str = ""
-    company: str = ""
+    job_url: str = Field("", max_length=2000)
+    job_description: str = Field("", max_length=10000)
+    job_title: str = Field("", max_length=500)
+    company: str = Field("", max_length=200)
 
 
 @app.post("/api/cv/tailor")
+@limiter.limit("5/minute")
 def tailor_cv(req: CVTailorRequest, request: Request):
     user = require_user(request)
     db = SessionLocal()
@@ -1811,6 +1935,8 @@ def tailor_cv(req: CVTailorRequest, request: Request):
 
     job_desc = req.job_description
     if not job_desc and req.job_url:
+        if not validate_url(req.job_url):
+            raise HTTPException(400, "URL non autorisée")
         job_desc = fetch_job_description(req.job_url)
 
     cv_text = profile.cv or ""
@@ -1855,16 +1981,17 @@ Réponds UNIQUEMENT en JSON valide."""
         return {"tailored_cv": cv_text, "changes_made": [], "keyword_matches": [], "missing_keywords": [], "error": "Impossible de parser la réponse IA."}
     except Exception as e:
         logger.error(f"CV tailor error: {e}")
-        raise HTTPException(500, "Erreur lors de l'optimisation du CV.")
+        raise HTTPException(500, "Erreur interne du serveur.")
 
 
 # --- ATS Score ---
 class ATSScoreRequest(BaseModel):
-    job_url: str = ""
-    job_description: str = ""
+    job_url: str = Field("", max_length=2000)
+    job_description: str = Field("", max_length=10000)
 
 
 @app.post("/api/cv/ats-score")
+@limiter.limit("5/minute")
 def ats_score(req: ATSScoreRequest, request: Request):
     user = require_user(request)
     db = SessionLocal()
@@ -1877,6 +2004,8 @@ def ats_score(req: ATSScoreRequest, request: Request):
 
     job_desc = req.job_description
     if not job_desc and req.job_url:
+        if not validate_url(req.job_url):
+            raise HTTPException(400, "URL non autorisée")
         job_desc = fetch_job_description(req.job_url)
 
     cv_text = profile.cv or ""
@@ -1919,26 +2048,27 @@ Réponds UNIQUEMENT en JSON valide."""
         return {"score": 50, "keyword_analysis": {"found": [], "missing": []}, "format_tips": [], "improvement_suggestions": [], "error": "Impossible de parser la réponse IA."}
     except Exception as e:
         logger.error(f"ATS score error: {e}")
-        raise HTTPException(500, "Erreur lors du calcul du score ATS.")
+        raise HTTPException(500, "Erreur interne du serveur.")
 
 
 # --- Interview Prep ---
 class InterviewPrepRequest(BaseModel):
-    job_title: str = ""
-    company: str = ""
-    job_description: str = ""
-    job_url: str = ""
+    job_title: str = Field("", max_length=500)
+    company: str = Field("", max_length=200)
+    job_description: str = Field("", max_length=10000)
+    job_url: str = Field("", max_length=2000)
 
 
 class InterviewSimulateRequest(BaseModel):
-    job_title: str = ""
-    company: str = ""
-    user_answer: str = ""
+    job_title: str = Field("", max_length=500)
+    company: str = Field("", max_length=200)
+    user_answer: str = Field("", max_length=10000)
     question_index: int = 0
     conversation_history: list = []
 
 
 @app.post("/api/interview/prepare")
+@limiter.limit("5/minute")
 def interview_prepare(req: InterviewPrepRequest, request: Request):
     user = require_user(request)
     db = SessionLocal()
@@ -1953,6 +2083,8 @@ def interview_prepare(req: InterviewPrepRequest, request: Request):
 
     job_desc = req.job_description
     if not job_desc and req.job_url:
+        if not validate_url(req.job_url):
+            raise HTTPException(400, "URL non autorisée")
         job_desc = fetch_job_description(req.job_url)
 
     prompt = f"""Tu es un coach d'entretien d'embauche expert. Prépare le candidat pour un entretien.
@@ -1987,10 +2119,11 @@ Réponds UNIQUEMENT en JSON valide."""
         return {"questions": [], "suggested_answers": [], "company_research_tips": [], "salary_range_estimate": "", "error": "Impossible de parser la réponse IA."}
     except Exception as e:
         logger.error(f"Interview prep error: {e}")
-        raise HTTPException(500, "Erreur lors de la préparation de l'entretien.")
+        raise HTTPException(500, "Erreur interne du serveur.")
 
 
 @app.post("/api/interview/simulate")
+@limiter.limit("20/minute")
 def interview_simulate(req: InterviewSimulateRequest, request: Request):
     user = require_user(request)
     db = SessionLocal()
@@ -2043,25 +2176,26 @@ Réponds UNIQUEMENT en JSON valide."""
         return {"feedback": "", "score": 5, "next_question": "", "tips": [], "error": "Impossible de parser la réponse IA."}
     except Exception as e:
         logger.error(f"Interview simulate error: {e}")
-        raise HTTPException(500, "Erreur lors de la simulation d'entretien.")
+        raise HTTPException(500, "Erreur interne du serveur.")
 
 
 # --- Email System ---
 class SendEmailRequest(BaseModel):
-    to_email: str
-    subject: str
-    body: str
+    to_email: str = Field(..., max_length=200)
+    subject: str = Field(..., max_length=500)
+    body: str = Field(..., max_length=50000)
     application_id: int = 0
 
 
 class ScheduleFollowupRequest(BaseModel):
     application_id: int
     delay_days: int = 7
-    subject: str = ""
-    body: str = ""
+    subject: str = Field("", max_length=500)
+    body: str = Field("", max_length=50000)
 
 
 @app.post("/api/email/send")
+@limiter.limit("10/minute")
 def send_email(req: SendEmailRequest, request: Request):
     user = require_user(request)
     db = SessionLocal()
@@ -2077,7 +2211,7 @@ def send_email(req: SendEmailRequest, request: Request):
             )
         except Exception as e:
             logger.error(f"Email send error: {e}")
-            raise HTTPException(500, f"Erreur d'envoi: {e}")
+            raise HTTPException(500, "Erreur interne du serveur.")
 
         # Save to history
         eh = EmailHistory(
@@ -2254,10 +2388,10 @@ Réponds UNIQUEMENT en JSON: un tableau de strings. Exemple: ["conseil1", "conse
 
 # --- Networking Messages ---
 class NetworkingMessageRequest(BaseModel):
-    person_name: str = ""
-    person_title: str = ""
-    person_company: str = ""
-    context: str = ""
+    person_name: str = Field("", max_length=200)
+    person_title: str = Field("", max_length=200)
+    person_company: str = Field("", max_length=200)
+    context: str = Field("", max_length=10000)
 
 
 @app.post("/api/networking/message")
@@ -2313,7 +2447,7 @@ Réponds UNIQUEMENT en JSON valide:
         return {"messages": [], "error": "Impossible de parser la réponse IA."}
     except Exception as e:
         logger.error(f"Networking message error: {e}")
-        raise HTTPException(500, "Erreur lors de la génération des messages.")
+        raise HTTPException(500, "Erreur interne du serveur.")
 
 
 # --- Share Profile ---
@@ -2334,7 +2468,8 @@ def share_profile(request: Request):
 
 
 @app.get("/api/shared/{token}")
-def get_shared_profile(token: str):
+@limiter.limit("10/minute")
+def get_shared_profile(token: str, request: Request):
     db = SessionLocal()
     try:
         profile = db.query(Profile).filter(Profile.share_token == token).first()
@@ -2360,18 +2495,18 @@ def get_shared_profile(token: str):
             score += 20
 
         # Saved jobs titles
-        saved = db.query(SavedJob).filter(SavedJob.user_id == profile.user_id).all()
+        saved = db.query(SavedJob).filter(SavedJob.user_id == profile.user_id).limit(100).all()
         saved_titles = [j.title for j in saved]
 
         # Applications summary
-        apps = db.query(Application).filter(Application.user_id == profile.user_id).all()
+        apps = db.query(Application).filter(Application.user_id == profile.user_id).limit(100).all()
         apps_summary = {"total": len(apps)}
         for a in apps:
             apps_summary[a.status] = apps_summary.get(a.status, 0) + 1
 
         return {
             "name": user.name if user else "",
-            "cv_text": cv_text,
+            "cv_text": cv_text[:200] if cv_text else "",
             "goals": profile.goals or "",
             "completion_score": score,
             "saved_jobs": saved_titles,
@@ -2397,7 +2532,7 @@ def delete_share_profile(request: Request):
 
 # --- LinkedIn Import ---
 class LinkedInImportRequest(BaseModel):
-    linkedin_url: str
+    linkedin_url: str = Field(..., max_length=2000)
 
 
 @app.post("/api/profile/import-linkedin")
@@ -2405,6 +2540,9 @@ def import_linkedin(req: LinkedInImportRequest, request: Request):
     user = require_user(request)
     if not req.linkedin_url or "linkedin.com" not in req.linkedin_url:
         raise HTTPException(400, "URL LinkedIn invalide.")
+
+    if not validate_url(req.linkedin_url):
+        raise HTTPException(400, "URL non autorisée")
 
     resp = safe_request(req.linkedin_url)
     if not resp or resp.status_code != 200:
@@ -2563,10 +2701,10 @@ def export_cv_pdf(request: Request, version: int = 0, tailored: bool = False, jo
             headers={"Content-Disposition": "attachment; filename=cv.pdf"},
         )
     except ImportError:
-        raise HTTPException(500, "reportlab n'est pas installé. Ajoutez-le avec: pip install reportlab")
+        raise HTTPException(500, "Erreur interne du serveur.")
     except Exception as e:
         logger.error(f"PDF export error: {e}")
-        raise HTTPException(500, "Erreur lors de la génération du PDF.")
+        raise HTTPException(500, "Erreur interne du serveur.")
 
 
 @app.get("/api/export/letter/{letter_id}")
@@ -2616,7 +2754,14 @@ def export_letter_pdf(letter_id: int, request: Request):
             headers={"Content-Disposition": f"attachment; filename=lettre_{letter_id}.pdf"},
         )
     except ImportError:
-        raise HTTPException(500, "reportlab n'est pas installé.")
+        raise HTTPException(500, "Erreur interne du serveur.")
     except Exception as e:
         logger.error(f"Letter PDF export error: {e}")
-        raise HTTPException(500, "Erreur lors de la génération du PDF.")
+        raise HTTPException(500, "Erreur interne du serveur.")
+
+
+# --- Global Exception Handler ---
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    logger.error(f"Unhandled error: {exc}")
+    return JSONResponse(status_code=500, content={"detail": "Erreur interne du serveur."})

@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>JobHunter AI</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet"/>
-<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script crossorigin="anonymous" src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin="anonymous" src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script crossorigin="anonymous" src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script crossorigin="anonymous" src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
 :root{
@@ -713,6 +713,15 @@ const Icon = {
   Copy: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>,
 };
 
+/* ---- SECURITY HELPERS ---- */
+function isSafeUrl(url) {
+  if (!url) return false;
+  try { const u = new URL(url); return u.protocol === 'https:' || u.protocol === 'http:'; }
+  catch { return false; }
+}
+
+const isValidLinkedinUrl = (url) => /^https:\/\/(www\.)?linkedin\.com\/in\//.test(url);
+
 function ToastContainer({ toasts }) {
   return <div className="toast-container">{toasts.map((t,i) => <div key={i} className={`toast toast-${t.type}`}>{t.message}</div>)}</div>;
 }
@@ -728,14 +737,14 @@ async function api(path, opts = {}) {
   const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}`, ...opts.headers };
   const res = await fetch(path, { ...opts, headers });
   if (res.status === 401) { clearToken(); window.location.reload(); throw new Error('Session expirée'); }
-  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || 'Erreur serveur'); }
+  if (!res.ok) { const e = await res.json().catch(() => ({})); const msg = typeof e.detail === 'string' && e.detail.length < 200 ? e.detail : 'Erreur serveur'; throw new Error(msg); }
   return res.json();
 }
 
 async function apiUpload(path, formData) {
   const res = await fetch(path, { method: 'POST', headers: { 'Authorization': `Bearer ${getToken()}` }, body: formData });
   if (res.status === 401) { clearToken(); window.location.reload(); throw new Error('Session expirée'); }
-  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || 'Erreur serveur'); }
+  if (!res.ok) { const e = await res.json().catch(() => ({})); const msg = typeof e.detail === 'string' && e.detail.length < 200 ? e.detail : 'Erreur serveur'; throw new Error(msg); }
   return res.json();
 }
 
@@ -774,16 +783,16 @@ function LoginPage({ onLogin }) {
           {isRegister && (
             <div style={{marginBottom:12}}>
               <label className="input-label">{t('firstName')}</label>
-              <input className="input" placeholder={t('firstName')} value={name} onChange={e => setName(e.target.value)} />
+              <input className="input" placeholder={t('firstName')} value={name} onChange={e => setName(e.target.value)} maxLength={200} />
             </div>
           )}
           <div style={{marginBottom:12}}>
             <label className="input-label">{t('email')}</label>
-            <input className="input" type="email" placeholder="votre@email.com" value={email} onChange={e => setEmail(e.target.value)} required />
+            <input className="input" type="email" placeholder="votre@email.com" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="email" maxLength={200} />
           </div>
           <div style={{marginBottom:16}}>
             <label className="input-label">{t('password')}</label>
-            <input className="input" type="password" placeholder="••••••" value={password} onChange={e => setPassword(e.target.value)} required />
+            <input className="input" type="password" placeholder="••••••" value={password} onChange={e => setPassword(e.target.value)} required autoComplete={isRegister ? 'new-password' : 'current-password'} maxLength={128} />
           </div>
           {error && <p style={{color:'var(--danger)',fontSize:13,marginBottom:12}}>{error}</p>}
           <button className="btn btn-primary" type="submit" disabled={loading} style={{width:'100%',justifyContent:'center',padding:'14px',fontSize:15}}>
@@ -841,7 +850,7 @@ function App() {
   useEffect(() => { if (isLoggedIn) { loadProfile(); loadStats(); loadSaved(); } }, [isLoggedIn]);
 
   const onLangChange = (newLang) => { setLang(newLang); setLangTick(n => n + 1); };
-  const logout = () => { clearToken(); setUser(null); };
+  const logout = async () => { try { await api('/api/auth/logout', { method: 'POST' }); } catch(e) {} clearToken(); setUser(null); };
   const toggleDarkMode = () => { const next = !darkMode; setDarkMode(next); applyTheme(next); };
 
   if (!isLoggedIn) return <><LoginPage onLogin={setUser} /><ToastContainer toasts={toasts} /></>;
@@ -947,7 +956,7 @@ function DashboardPage({ stats, profile, profileComplete, setPage, user }) {
       <div className="card">
         <h3 className="card-title" style={{marginBottom:12}}>{t('dashboardQuickSearch')}</h3>
         <div style={{display:'flex',gap:12}}>
-          <input className="input" value={quickSearch} onChange={e=>setQuickSearch(e.target.value)} placeholder={t('dashboardSearchPlaceholder')} onKeyDown={e => e.key==='Enter' && handleQuickSearch()} style={{flex:1}} />
+          <input className="input" value={quickSearch} onChange={e=>setQuickSearch(e.target.value)} placeholder={t('dashboardSearchPlaceholder')} onKeyDown={e => e.key==='Enter' && handleQuickSearch()} style={{flex:1}} maxLength={500} />
           <button className="btn btn-primary" onClick={handleQuickSearch}>{t('searchBtn')}</button>
         </div>
       </div>
@@ -1021,8 +1030,11 @@ function PdfUploadZone({ onTextExtracted, toast, label }) {
   const fileRef = useRef();
 
   const uploadPdf = async (file) => {
-    if (!file || !file.name.toLowerCase().endsWith('.pdf')) {
+    if (!file || file.type !== 'application/pdf') {
       toast(t('selectPdf'), 'error'); return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast('Fichier trop volumineux (max 10 Mo)', 'error'); return;
     }
     setUploading(true);
     try {
@@ -1061,7 +1073,7 @@ function ProfilePage({ profile, setProfile, loadProfile, loadStats, toast, onLan
   const [saving, setSaving] = useState(false);
   const [smtpExpanded, setSmtpExpanded] = useState(false);
   const [smtpEmail, setSmtpEmail] = useState(profile.smtp_email || '');
-  const [smtpPassword, setSmtpPassword] = useState(profile.smtp_password || '');
+  const [smtpPassword, setSmtpPassword] = useState('');
   const [smtpHost, setSmtpHost] = useState(profile.smtp_host || '');
   const [smtpPort, setSmtpPort] = useState(profile.smtp_port || '587');
   const [shareUrl, setShareUrl] = useState(profile.share_url || '');
@@ -1082,11 +1094,15 @@ function ProfilePage({ profile, setProfile, loadProfile, loadStats, toast, onLan
   const save = async () => {
     setSaving(true);
     try {
-      await api('/api/profile/save', { method: 'POST', body: JSON.stringify({
+      const saveData = {
         cv: cvs[0]?.content || '', cover_letter: coverLetters[0]?.content || '', goals,
         cvs, cover_letters: coverLetters, language: lang, dark_mode: darkMode,
-        smtp_email: smtpEmail, smtp_password: smtpPassword, smtp_host: smtpHost, smtp_port: smtpPort
-      })});
+        smtp_email: smtpEmail, smtp_host: smtpHost, smtp_port: smtpPort
+      };
+      if (smtpPassword && smtpPassword !== '********') {
+        saveData.smtp_password = smtpPassword;
+      }
+      await api('/api/profile/save', { method: 'POST', body: JSON.stringify(saveData) });
       toast(t('profileSaved'));
       setLang(lang);
       if (onLangChange) onLangChange(lang);
@@ -1148,12 +1164,12 @@ function ProfilePage({ profile, setProfile, loadProfile, loadStats, toast, onLan
         {cvs.map((cv, i) => (
           <div key={i} style={{borderTop: i > 0 ? '1px solid var(--border)' : 'none', paddingTop: i > 0 ? 16 : 0, marginTop: i > 0 ? 16 : 0}}>
             <div style={{display:'flex',gap:12,alignItems:'center',marginBottom:8}}>
-              <input className="input" style={{flex:1}} value={cv.name} onChange={e => updateCv(i, 'name', e.target.value)} placeholder={t('name')} />
+              <input className="input" style={{flex:1}} value={cv.name} onChange={e => updateCv(i, 'name', e.target.value)} placeholder={t('name')} maxLength={200} />
               <button className="btn btn-outline" style={{color:'var(--danger)',borderColor:'var(--danger)',fontSize:12,padding:'6px 12px'}} onClick={() => removeCv(i)}>{t('delete')}</button>
             </div>
             <PdfUploadZone toast={toast} onTextExtracted={(text, filename) => updateCv(i, 'content', text)} />
             <p className="card-subtitle" style={{marginBottom:6,marginTop:8}}>{t('pasteText')}</p>
-            <textarea className="textarea" style={{minHeight:120}} value={cv.content} onChange={e => updateCv(i, 'content', e.target.value)} placeholder={t('cvPlaceholder')} />
+            <textarea className="textarea" style={{minHeight:120}} value={cv.content} onChange={e => updateCv(i, 'content', e.target.value)} placeholder={t('cvPlaceholder')} maxLength={50000} />
           </div>
         ))}
       </div>
@@ -1173,12 +1189,12 @@ function ProfilePage({ profile, setProfile, loadProfile, loadStats, toast, onLan
         {coverLetters.map((cl, i) => (
           <div key={i} style={{borderTop: i > 0 ? '1px solid var(--border)' : 'none', paddingTop: i > 0 ? 16 : 0, marginTop: i > 0 ? 16 : 0}}>
             <div style={{display:'flex',gap:12,alignItems:'center',marginBottom:8}}>
-              <input className="input" style={{flex:1}} value={cl.name} onChange={e => updateCl(i, 'name', e.target.value)} placeholder={t('name')} />
+              <input className="input" style={{flex:1}} value={cl.name} onChange={e => updateCl(i, 'name', e.target.value)} placeholder={t('name')} maxLength={200} />
               <button className="btn btn-outline" style={{color:'var(--danger)',borderColor:'var(--danger)',fontSize:12,padding:'6px 12px'}} onClick={() => removeCl(i)}>{t('delete')}</button>
             </div>
             <PdfUploadZone toast={toast} onTextExtracted={(text, filename) => updateCl(i, 'content', text)} />
             <p className="card-subtitle" style={{marginBottom:6,marginTop:8}}>{t('pasteText')}</p>
-            <textarea className="textarea" style={{minHeight:120}} value={cl.content} onChange={e => updateCl(i, 'content', e.target.value)} placeholder={t('coverLetterPlaceholder')} />
+            <textarea className="textarea" style={{minHeight:120}} value={cl.content} onChange={e => updateCl(i, 'content', e.target.value)} placeholder={t('coverLetterPlaceholder')} maxLength={50000} />
           </div>
         ))}
       </div>
@@ -1187,7 +1203,7 @@ function ProfilePage({ profile, setProfile, loadProfile, loadStats, toast, onLan
       <div className="card">
         <h3 className="card-title">{t('myGoals')}</h3>
         <p className="card-subtitle">{t('goalsSubtitle')}</p>
-        <textarea className="textarea" style={{minHeight:150}} value={goals} onChange={e => setGoals(e.target.value)} placeholder={t('goalsPlaceholder')} />
+        <textarea className="textarea" style={{minHeight:150}} value={goals} onChange={e => setGoals(e.target.value)} placeholder={t('goalsPlaceholder')} maxLength={50000} />
       </div>
 
       {/* Dark mode toggle */}
@@ -1213,19 +1229,19 @@ function ProfilePage({ profile, setProfile, loadProfile, loadStats, toast, onLan
           <div style={{marginTop:16,display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
             <div>
               <label className="input-label">{t('smtpEmail')}</label>
-              <input className="input" value={smtpEmail} onChange={e => setSmtpEmail(e.target.value)} placeholder="you@example.com" />
+              <input className="input" value={smtpEmail} onChange={e => setSmtpEmail(e.target.value)} placeholder="you@example.com" maxLength={200} />
             </div>
             <div>
               <label className="input-label">{t('smtpPassword')}</label>
-              <input className="input" type="password" value={smtpPassword} onChange={e => setSmtpPassword(e.target.value)} placeholder="••••••" />
+              <input className="input" type="password" value={smtpPassword} onChange={e => setSmtpPassword(e.target.value)} placeholder={profile.smtp_password ? '********' : '••••••'} autoComplete="off" maxLength={128} />
             </div>
             <div>
               <label className="input-label">{t('smtpHost')}</label>
-              <input className="input" value={smtpHost} onChange={e => setSmtpHost(e.target.value)} placeholder="smtp.gmail.com" />
+              <input className="input" value={smtpHost} onChange={e => setSmtpHost(e.target.value)} placeholder="smtp.gmail.com" maxLength={200} />
             </div>
             <div>
               <label className="input-label">{t('smtpPort')}</label>
-              <input className="input" value={smtpPort} onChange={e => setSmtpPort(e.target.value)} placeholder="587" />
+              <input className="input" value={smtpPort} onChange={e => setSmtpPort(e.target.value)} placeholder="587" maxLength={5} />
             </div>
           </div>
         )}
@@ -1259,9 +1275,10 @@ function ProfilePage({ profile, setProfile, loadProfile, loadStats, toast, onLan
         <div style={{display:'flex',gap:12,alignItems:'flex-end',marginTop:8}}>
           <div style={{flex:1}}>
             <label className="input-label">{t('linkedinUrl')}</label>
-            <input className="input" value={linkedinUrl} onChange={e => setLinkedinUrl(e.target.value)} placeholder="https://www.linkedin.com/in/..." />
+            <input className="input" value={linkedinUrl} onChange={e => setLinkedinUrl(e.target.value)} placeholder="https://www.linkedin.com/in/..." maxLength={2000} />
           </div>
           <button className="btn btn-primary" disabled={linkedinLoading || !linkedinUrl.trim()} onClick={async () => {
+            if (!isValidLinkedinUrl(linkedinUrl)) { toast('URL LinkedIn invalide (ex: https://www.linkedin.com/in/...)', 'error'); return; }
             setLinkedinLoading(true);
             try {
               const data = await api('/api/profile/import-linkedin', { method: 'POST', body: JSON.stringify({ linkedin_url: linkedinUrl }) });
@@ -1334,11 +1351,11 @@ function SearchPage({ savedJobs, loadSaved, loadStats, toast, setPage, setStats 
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:16}}>
           <div>
             <label className="input-label">{t('keywords')}</label>
-            <input className="input" value={keywords} onChange={e=>setKeywords(e.target.value)} placeholder={t('keywordsPlaceholder')} onKeyDown={e => e.key==='Enter' && search()} />
+            <input className="input" value={keywords} onChange={e=>setKeywords(e.target.value)} placeholder={t('keywordsPlaceholder')} onKeyDown={e => e.key==='Enter' && search()} maxLength={500} />
           </div>
           <div>
             <label className="input-label">{t('locationLabel')}</label>
-            <input className="input" value={location} onChange={e=>setLocation(e.target.value)} placeholder="France" />
+            <input className="input" value={location} onChange={e=>setLocation(e.target.value)} placeholder="France" maxLength={500} />
           </div>
         </div>
         <div className="checkbox-row">
@@ -1384,7 +1401,7 @@ function SearchPage({ savedJobs, loadSaved, loadStats, toast, setPage, setStats 
                 </div>
                 <div className="job-actions">
                   <button className="star-btn" onClick={() => toggleSave(job)}><Icon.Star filled={isSaved} /></button>
-                  {job.url && job.url !== '#' && <a href={job.url} target="_blank" rel="noopener noreferrer" className="btn btn-outline" style={{fontSize:12,padding:'6px 12px'}}>{t('viewOffer')}</a>}
+                  {isSafeUrl(job.url) && job.url !== '#' && <a href={job.url} target="_blank" rel="noopener noreferrer" className="btn btn-outline" style={{fontSize:12,padding:'6px 12px'}}>{t('viewOffer')}</a>}
                   <button className="btn btn-primary" style={{fontSize:12,padding:'6px 12px'}} onClick={() => setPage('letter')}>{t('generateLetterBtn')}</button>
                 </div>
               </div>
@@ -1458,12 +1475,12 @@ function LetterPage({ savedJobs, loadStats, toast }) {
         ) : (
           <div>
             <label className="input-label">{t('jobDescription')}</label>
-            <textarea className="textarea" style={{minHeight:150}} value={manualDesc} onChange={e=>setManualDesc(e.target.value)} placeholder={t('pasteDescription')} />
+            <textarea className="textarea" style={{minHeight:150}} value={manualDesc} onChange={e=>setManualDesc(e.target.value)} placeholder={t('pasteDescription')} maxLength={50000} />
           </div>
         )}
         <div style={{marginTop:16}}>
           <label className="input-label">{t('specificInstruction')}</label>
-          <input className="input" value={instruction} onChange={e=>setInstruction(e.target.value)} placeholder={t('instructionPlaceholder')} />
+          <input className="input" value={instruction} onChange={e=>setInstruction(e.target.value)} placeholder={t('instructionPlaceholder')} maxLength={500} />
         </div>
         <div style={{marginTop:16}}>
           <label className="input-label">{t('letterLangLabel')}</label>
@@ -1483,7 +1500,7 @@ function LetterPage({ savedJobs, loadStats, toast }) {
             <span style={{fontWeight:600}}>{letterJob.title}</span>
             {letterJob.company && <span style={{color:'var(--text-secondary)'}}> — {letterJob.company}</span>}
           </div>
-          <textarea className="textarea" style={{minHeight:400,lineHeight:1.8,whiteSpace:'pre-wrap'}} value={letter} onChange={e => setLetter(e.target.value)} />
+          <textarea className="textarea" style={{minHeight:400,lineHeight:1.8,whiteSpace:'pre-wrap'}} value={letter} onChange={e => setLetter(e.target.value)} maxLength={50000} />
           <div style={{display:'flex',gap:12,marginTop:16,justifyContent:'flex-end',flexWrap:'wrap'}}>
             {!markedSent && <button className="btn btn-outline" style={{borderColor:'var(--success)',color:'var(--success)'}} onClick={markAsSent}>{t('markAsSent')}</button>}
             {markedSent && <span style={{display:'flex',alignItems:'center',color:'var(--success)',fontSize:13,fontWeight:500}}>&#10003; {t('applicationSaved')}</span>}
@@ -1544,7 +1561,7 @@ function RecapPage({ stats, savedJobs }) {
               <div className={`score-badge ${j.score>=7?'score-high':j.score>=4?'score-mid':'score-low'}`} style={{width:36,height:36,fontSize:13}}>{Math.round(j.score)}</div>
               <div><div className="recap-title">{j.title}</div><div className="recap-date">{j.company}</div></div>
             </div>
-            {j.url && j.url !== '#' && <a href={j.url} target="_blank" rel="noopener noreferrer" className="btn btn-outline" style={{fontSize:12,padding:'6px 14px'}}>{t('view')}</a>}
+            {isSafeUrl(j.url) && j.url !== '#' && <a href={j.url} target="_blank" rel="noopener noreferrer" className="btn btn-outline" style={{fontSize:12,padding:'6px 14px'}}>{t('view')}</a>}
           </div>
         ))}
       </div>
@@ -1641,20 +1658,20 @@ function HumanPage({ toast }) {
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,marginBottom:12}}>
           <div>
             <label className="input-label">{t('humanKeywords')} 1 *</label>
-            <input className="input" value={kw1} onChange={e=>setKw1(e.target.value)} placeholder={t('humanKeywordsPlaceholder')} onKeyDown={e => e.key==='Enter' && search()} />
+            <input className="input" value={kw1} onChange={e=>setKw1(e.target.value)} placeholder={t('humanKeywordsPlaceholder')} onKeyDown={e => e.key==='Enter' && search()} maxLength={200} />
           </div>
           <div>
             <label className="input-label">{t('humanKeywords')} 2</label>
-            <input className="input" value={kw2} onChange={e=>setKw2(e.target.value)} placeholder="ex: directeur" onKeyDown={e => e.key==='Enter' && search()} />
+            <input className="input" value={kw2} onChange={e=>setKw2(e.target.value)} placeholder="ex: directeur" onKeyDown={e => e.key==='Enter' && search()} maxLength={200} />
           </div>
           <div>
             <label className="input-label">{t('humanKeywords')} 3</label>
-            <input className="input" value={kw3} onChange={e=>setKw3(e.target.value)} placeholder="ex: marketing" onKeyDown={e => e.key==='Enter' && search()} />
+            <input className="input" value={kw3} onChange={e=>setKw3(e.target.value)} placeholder="ex: marketing" onKeyDown={e => e.key==='Enter' && search()} maxLength={200} />
           </div>
         </div>
         <div style={{marginBottom:16}}>
           <label className="input-label">{t('humanLocation')}</label>
-          <input className="input" value={location} onChange={e=>setLocation(e.target.value)} placeholder={t('humanLocationPlaceholder')} onKeyDown={e => e.key==='Enter' && search()} style={{maxWidth:300}} />
+          <input className="input" value={location} onChange={e=>setLocation(e.target.value)} placeholder={t('humanLocationPlaceholder')} onKeyDown={e => e.key==='Enter' && search()} style={{maxWidth:300}} maxLength={500} />
         </div>
         <button className="btn btn-primary" onClick={search} disabled={loading}>{loading ? t('humanSearching') : t('humanSearchBtn')}</button>
       </div>
@@ -1717,7 +1734,7 @@ function HumanPage({ toast }) {
                       <td><span className="people-title">{p.title}</span></td>
                       <td>{p.company}</td>
                       <td>{p.location}</td>
-                      <td><a href={p.linkedin_url} target="_blank" rel="noopener noreferrer">{t('humanView')}</a></td>
+                      <td>{isSafeUrl(p.linkedin_url) ? <a href={p.linkedin_url} target="_blank" rel="noopener noreferrer">{t('humanView')}</a> : null}</td>
                       <td>
                         <button className="btn btn-outline" style={{fontSize:11,padding:'4px 10px'}} onClick={() => { setMsgPerson(msgPerson === i ? null : i); setMessages(null); }}>
                           {t('generateMessage')}
@@ -1728,7 +1745,7 @@ function HumanPage({ toast }) {
                       <tr><td colSpan="6" style={{padding:'12px 16px',background:'var(--main-bg)'}}>
                         <div style={{marginBottom:12}}>
                           <label className="input-label">{t('messageContext')}</label>
-                          <input className="input" value={msgContext} onChange={e => setMsgContext(e.target.value)} placeholder={t('messageContextPlaceholder')} style={{maxWidth:400}} />
+                          <input className="input" value={msgContext} onChange={e => setMsgContext(e.target.value)} placeholder={t('messageContextPlaceholder')} style={{maxWidth:400}} maxLength={500} />
                         </div>
                         <button className="btn btn-primary" style={{fontSize:12,marginBottom:12}} disabled={msgLoading} onClick={async () => {
                           setMsgLoading(true);
@@ -1809,7 +1826,7 @@ function AlertsPage({ toast, setPage }) {
             {alert.explanation && <div className="job-explanation">{alert.explanation}</div>}
           </div>
           <div className="job-actions">
-            {alert.url && <a href={alert.url} target="_blank" rel="noopener noreferrer" className="btn btn-outline" style={{fontSize:12,padding:'6px 12px'}}>{t('alertsSeeOffer')}</a>}
+            {isSafeUrl(alert.url) && <a href={alert.url} target="_blank" rel="noopener noreferrer" className="btn btn-outline" style={{fontSize:12,padding:'6px 12px'}}>{t('alertsSeeOffer')}</a>}
             <button className="btn btn-primary" style={{fontSize:12,padding:'6px 12px'}} onClick={(e) => { e.stopPropagation(); setPage('letter'); }}>{t('alertsGenerateLetter')}</button>
           </div>
         </div>
@@ -1881,15 +1898,15 @@ function TrackerPage({ toast, setPage }) {
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,marginBottom:12}}>
             <div>
               <label className="input-label">{t('keywords')}</label>
-              <input className="input" value={formTitle} onChange={e=>setFormTitle(e.target.value)} placeholder="Job title" />
+              <input className="input" value={formTitle} onChange={e=>setFormTitle(e.target.value)} placeholder="Job title" maxLength={200} />
             </div>
             <div>
               <label className="input-label">{t('humanCompany')}</label>
-              <input className="input" value={formCompany} onChange={e=>setFormCompany(e.target.value)} placeholder="Company" />
+              <input className="input" value={formCompany} onChange={e=>setFormCompany(e.target.value)} placeholder="Company" maxLength={200} />
             </div>
             <div>
               <label className="input-label">URL</label>
-              <input className="input" value={formUrl} onChange={e=>setFormUrl(e.target.value)} placeholder="https://..." />
+              <input className="input" value={formUrl} onChange={e=>setFormUrl(e.target.value)} placeholder="https://..." maxLength={2000} />
             </div>
           </div>
           <button className="btn btn-primary" onClick={addApp}>{t('trackerAdd')}</button>
@@ -1923,7 +1940,7 @@ function TrackerPage({ toast, setPage }) {
                     <textarea className="textarea" style={{fontSize:12,minHeight:50,marginBottom:8}} placeholder={t('applicationNotes')}
                       defaultValue={app.notes || ''} onBlur={e => { if (e.target.value !== (app.notes || '')) updateApp(app.id, { notes: e.target.value }); }} />
                     <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-                      {app.url && <a href={app.url} target="_blank" rel="noopener noreferrer" className="btn btn-outline" style={{fontSize:11,padding:'3px 8px'}}>{t('viewOffer')}</a>}
+                      {isSafeUrl(app.url) && <a href={app.url} target="_blank" rel="noopener noreferrer" className="btn btn-outline" style={{fontSize:11,padding:'3px 8px'}}>{t('viewOffer')}</a>}
                       <button className="btn btn-outline" style={{fontSize:11,padding:'3px 8px'}} onClick={() => setPage('email')}>{t('sendEmailBtn')}</button>
                       <button className="btn btn-outline" style={{fontSize:11,padding:'3px 8px'}} onClick={() => setPage('email')}>{t('scheduleFollowupBtn')}</button>
                       <button className="btn btn-outline" style={{fontSize:11,padding:'3px 8px',color:'var(--danger)',borderColor:'var(--danger)'}} onClick={() => deleteApp(app.id)}>{t('applicationDelete')}</button>
@@ -1978,20 +1995,20 @@ function CVTailorPage({ toast }) {
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
           <div>
             <label className="input-label">{t('jobUrl')}</label>
-            <input className="input" value={jobUrl} onChange={e => setJobUrl(e.target.value)} placeholder="https://..." />
+            <input className="input" value={jobUrl} onChange={e => setJobUrl(e.target.value)} placeholder="https://..." maxLength={2000} />
           </div>
           <div>
             <label className="input-label">{t('jobTitleLabel')}</label>
-            <input className="input" value={jobTitle} onChange={e => setJobTitle(e.target.value)} placeholder={t('jobTitleLabel')} />
+            <input className="input" value={jobTitle} onChange={e => setJobTitle(e.target.value)} placeholder={t('jobTitleLabel')} maxLength={200} />
           </div>
         </div>
         <div style={{marginBottom:12}}>
           <label className="input-label">{t('companyLabel')}</label>
-          <input className="input" value={company} onChange={e => setCompany(e.target.value)} placeholder={t('companyLabel')} style={{maxWidth:400}} />
+          <input className="input" value={company} onChange={e => setCompany(e.target.value)} placeholder={t('companyLabel')} style={{maxWidth:400}} maxLength={200} />
         </div>
         <div style={{marginBottom:16}}>
           <label className="input-label">{t('jobDescription')}</label>
-          <textarea className="textarea" style={{minHeight:150}} value={jobDesc} onChange={e => setJobDesc(e.target.value)} placeholder={t('pasteDescription')} />
+          <textarea className="textarea" style={{minHeight:150}} value={jobDesc} onChange={e => setJobDesc(e.target.value)} placeholder={t('pasteDescription')} maxLength={50000} />
         </div>
         <div style={{display:'flex',gap:12}}>
           <button className="btn btn-primary" onClick={tailor} disabled={loading}>{loading ? t('analyzing') : t('analyzeAdapt')}</button>
@@ -2158,16 +2175,16 @@ function InterviewPage({ toast }) {
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
           <div>
             <label className="input-label">{t('jobTitleLabel')}</label>
-            <input className="input" value={jobTitle} onChange={e => setJobTitle(e.target.value)} placeholder={t('jobTitleLabel')} />
+            <input className="input" value={jobTitle} onChange={e => setJobTitle(e.target.value)} placeholder={t('jobTitleLabel')} maxLength={200} />
           </div>
           <div>
             <label className="input-label">{t('companyLabel')}</label>
-            <input className="input" value={company} onChange={e => setCompany(e.target.value)} placeholder={t('companyLabel')} />
+            <input className="input" value={company} onChange={e => setCompany(e.target.value)} placeholder={t('companyLabel')} maxLength={200} />
           </div>
         </div>
         <div style={{marginBottom:16}}>
           <label className="input-label">{t('jobDescription')}</label>
-          <textarea className="textarea" style={{minHeight:100}} value={jobDesc} onChange={e => setJobDesc(e.target.value)} placeholder={t('pasteDescription')} />
+          <textarea className="textarea" style={{minHeight:100}} value={jobDesc} onChange={e => setJobDesc(e.target.value)} placeholder={t('pasteDescription')} maxLength={50000} />
         </div>
         {mode === 'prepare' && (
           <button className="btn btn-primary" onClick={generateQuestions} disabled={loading}>{loading ? t('generatingQuestions') : t('generateQuestions')}</button>
@@ -2226,7 +2243,7 @@ function InterviewPage({ toast }) {
           </div>
           {!simDone && (
             <div style={{display:'flex',gap:8}}>
-              <textarea className="textarea" style={{minHeight:60}} value={simInput} onChange={e => setSimInput(e.target.value)} placeholder={t('yourAnswer')} onKeyDown={e => { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); submitAnswer(); }}} />
+              <textarea className="textarea" style={{minHeight:60}} value={simInput} onChange={e => setSimInput(e.target.value)} placeholder={t('yourAnswer')} onKeyDown={e => { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); submitAnswer(); }}} maxLength={50000} />
               <button className="btn btn-primary" style={{alignSelf:'flex-end'}} onClick={submitAnswer} disabled={simLoading}>{t('submitAnswer')}</button>
             </div>
           )}
@@ -2287,15 +2304,15 @@ function EmailPage({ toast }) {
       <div className="card">
         <div style={{marginBottom:12}}>
           <label className="input-label">{t('emailTo')}</label>
-          <input className="input" value={to} onChange={e => setTo(e.target.value)} placeholder="email@example.com" />
+          <input className="input" value={to} onChange={e => setTo(e.target.value)} placeholder="email@example.com" maxLength={200} />
         </div>
         <div style={{marginBottom:12}}>
           <label className="input-label">{t('emailSubject')}</label>
-          <input className="input" value={subject} onChange={e => setSubject(e.target.value)} placeholder={t('emailSubject')} />
+          <input className="input" value={subject} onChange={e => setSubject(e.target.value)} placeholder={t('emailSubject')} maxLength={200} />
         </div>
         <div style={{marginBottom:12}}>
           <label className="input-label">{t('emailBody')}</label>
-          <textarea className="textarea" style={{minHeight:200}} value={body} onChange={e => setBody(e.target.value)} placeholder={t('emailBody')} />
+          <textarea className="textarea" style={{minHeight:200}} value={body} onChange={e => setBody(e.target.value)} placeholder={t('emailBody')} maxLength={50000} />
         </div>
         <div style={{display:'flex',alignItems:'center',gap:16,marginBottom:16}}>
           <label className="checkbox-label">
@@ -2503,7 +2520,7 @@ function ChatPanel({ onClose }) {
         <div ref={bottomRef}/>
       </div>
       <div className="chat-input-area">
-        <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&send()} placeholder={t('chatPlaceholder')} />
+        <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&send()} placeholder={t('chatPlaceholder')} maxLength={2000} />
         <button onClick={send} disabled={loading}><Icon.Send /></button>
       </div>
     </div>
