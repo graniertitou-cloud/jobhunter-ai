@@ -5,9 +5,12 @@ import logging
 import os
 import random
 import re
+import smtplib
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from typing import Optional
 from urllib.parse import quote, unquote
 
@@ -30,6 +33,7 @@ from fastapi.staticfiles import StaticFiles
 from openai import OpenAI
 from pydantic import BaseModel
 from sqlalchemy import (
+    Boolean,
     Column,
     DateTime,
     Float,
@@ -88,6 +92,12 @@ class Profile(Base):
     language = Column(String, default="fr")
     alert_keywords = Column(Text, default="")
     alert_location = Column(String, default="")
+    smtp_email = Column(String, default="")
+    smtp_password = Column(String, default="")
+    smtp_host = Column(String, default="smtp.gmail.com")
+    smtp_port = Column(Integer, default=587)
+    share_token = Column(String, nullable=True)
+    dark_mode = Column(Boolean, default=False)
 
 
 class SavedJob(Base):
@@ -152,6 +162,28 @@ class PeopleSearchHistory(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class EmailHistory(Base):
+    __tablename__ = "email_history"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    to_email = Column(String, nullable=False)
+    subject = Column(String, default="")
+    body = Column(Text, default="")
+    application_id = Column(Integer, nullable=True)
+    sent_at = Column(DateTime, default=datetime.utcnow)
+
+
+class ScheduledFollowup(Base):
+    __tablename__ = "scheduled_followups"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    application_id = Column(Integer, ForeignKey("applications.id"), nullable=False)
+    send_at = Column(DateTime, nullable=False)
+    subject = Column(String, default="")
+    body = Column(Text, default="")
+    sent = Column(Boolean, default=False)
+
+
 Base.metadata.create_all(engine)
 
 # --- Migration: add new columns if missing ---
@@ -170,6 +202,18 @@ try:
             conn.execute(text("ALTER TABLE profiles ADD COLUMN alert_keywords TEXT DEFAULT ''"))
         if "alert_location" not in existing_cols:
             conn.execute(text("ALTER TABLE profiles ADD COLUMN alert_location VARCHAR DEFAULT ''"))
+        if "smtp_email" not in existing_cols:
+            conn.execute(text("ALTER TABLE profiles ADD COLUMN smtp_email VARCHAR DEFAULT ''"))
+        if "smtp_password" not in existing_cols:
+            conn.execute(text("ALTER TABLE profiles ADD COLUMN smtp_password VARCHAR DEFAULT ''"))
+        if "smtp_host" not in existing_cols:
+            conn.execute(text("ALTER TABLE profiles ADD COLUMN smtp_host VARCHAR DEFAULT 'smtp.gmail.com'"))
+        if "smtp_port" not in existing_cols:
+            conn.execute(text("ALTER TABLE profiles ADD COLUMN smtp_port INTEGER DEFAULT 587"))
+        if "share_token" not in existing_cols:
+            conn.execute(text("ALTER TABLE profiles ADD COLUMN share_token VARCHAR"))
+        if "dark_mode" not in existing_cols:
+            conn.execute(text("ALTER TABLE profiles ADD COLUMN dark_mode BOOLEAN DEFAULT 0"))
         conn.commit()
     logger.info("Migration check done")
 except Exception as e:
@@ -219,6 +263,7 @@ def check_alerts():
             existing_alert_urls = {a.url for a in db.query(Alert).filter(Alert.user_id == prof.user_id).all() if a.url}
             existing_saved_urls = {s.url for s in db.query(SavedJob).filter(SavedJob.user_id == prof.user_id).all() if s.url}
             existing_urls = existing_alert_urls | existing_saved_urls
+            new_alerts = []
             for j in all_jobs:
                 if j.get("score", 0) >= 8:
                     job_url = j.get("url", "")
@@ -241,7 +286,24 @@ def check_alerts():
                         explanation=j.get("explanation", ""),
                     )
                     db.add(alert)
+                    new_alerts.append(j)
             db.commit()
+            # Send email notification if user has SMTP configured and there are new alerts
+            if new_alerts and getattr(prof, "smtp_email", "") and getattr(prof, "smtp_password", ""):
+                try:
+                    alert_lines = [f"- {a.get('title', '')} chez {a.get('company', '')} (score: {a.get('score', 0)})" for a in new_alerts[:10]]
+                    email_body = f"Bonjour,\n\nJobHunter AI a trouvé {len(new_alerts)} nouvelle(s) alerte(s) correspondant à vos critères:\n\n" + "\n".join(alert_lines) + "\n\nConnectez-vous pour voir les détails.\n\nJobHunter AI"
+                    _send_email(
+                        prof.smtp_email, prof.smtp_password,
+                        getattr(prof, "smtp_host", "smtp.gmail.com") or "smtp.gmail.com",
+                        getattr(prof, "smtp_port", 587) or 587,
+                        prof.smtp_email,
+                        f"JobHunter AI - {len(new_alerts)} nouvelle(s) alerte(s)",
+                        email_body,
+                    )
+                    logger.info(f"Alert email sent to user {prof.user_id}")
+                except Exception as e:
+                    logger.warning(f"Failed to send alert email to user {prof.user_id}: {e}")
             logger.info(f"Alert check done for user {prof.user_id}")
     except Exception as e:
         logger.warning(f"Alert scheduler error: {e}")
@@ -249,7 +311,67 @@ def check_alerts():
         db.close()
 
 
+def _send_email(smtp_email: str, smtp_password: str, smtp_host: str, smtp_port: int, to_email: str, subject: str, body: str):
+    """Send an email via SMTP. Raises on failure."""
+    msg = MIMEMultipart()
+    msg["From"] = smtp_email
+    msg["To"] = to_email
+    msg["Subject"] = subject
+    msg.attach(MIMEText(body, "plain", "utf-8"))
+    with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
+        server.starttls()
+        server.login(smtp_email, smtp_password)
+        server.send_message(msg)
+
+
+def check_followups():
+    """Background job: send due scheduled followup emails."""
+    db = SessionLocal()
+    try:
+        now = datetime.utcnow()
+        due = db.query(ScheduledFollowup).filter(
+            ScheduledFollowup.sent == False,
+            ScheduledFollowup.send_at <= now,
+        ).all()
+        for followup in due:
+            try:
+                prof = db.query(Profile).filter(Profile.user_id == followup.user_id).first()
+                if not prof or not prof.smtp_email or not prof.smtp_password:
+                    logger.warning(f"Followup {followup.id}: no SMTP config for user {followup.user_id}")
+                    continue
+                app_entry = db.query(Application).filter(Application.id == followup.application_id).first()
+                to_email = ""
+                if app_entry and app_entry.url:
+                    to_email = ""  # We need a recipient; use body as full email
+                _send_email(
+                    prof.smtp_email, prof.smtp_password,
+                    prof.smtp_host or "smtp.gmail.com", prof.smtp_port or 587,
+                    prof.smtp_email,  # send to self if no recipient known
+                    followup.subject, followup.body,
+                )
+                followup.sent = True
+                # Log in email history
+                eh = EmailHistory(
+                    user_id=followup.user_id, to_email=prof.smtp_email,
+                    subject=followup.subject, body=followup.body,
+                    application_id=followup.application_id,
+                )
+                db.add(eh)
+                if app_entry:
+                    app_entry.status = "followed_up"
+                    app_entry.updated_at = now
+                db.commit()
+                logger.info(f"Sent followup {followup.id} for user {followup.user_id}")
+            except Exception as e:
+                logger.warning(f"Followup {followup.id} send error: {e}")
+    except Exception as e:
+        logger.warning(f"Followup scheduler error: {e}")
+    finally:
+        db.close()
+
+
 _alert_scheduler.add_job(check_alerts, "interval", hours=24, id="check_alerts", replace_existing=True)
+_alert_scheduler.add_job(check_followups, "interval", hours=1, id="check_followups", replace_existing=True)
 
 
 @app.on_event("startup")
@@ -369,6 +491,11 @@ class ProfileData(BaseModel):
     cvs: list = []
     cover_letters: list = []
     language: str = "fr"
+    smtp_email: str = ""
+    smtp_password: str = ""
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    dark_mode: bool = False
 
 
 @app.get("/api/profile")
@@ -438,6 +565,10 @@ def get_profile(request: Request):
             "alert_location": getattr(p, "alert_location", "") or "",
             "completion_score": score,
             "completion_message": completion_msg,
+            "smtp_email": getattr(p, "smtp_email", "") or "",
+            "smtp_host": getattr(p, "smtp_host", "smtp.gmail.com") or "smtp.gmail.com",
+            "smtp_port": getattr(p, "smtp_port", 587) or 587,
+            "dark_mode": bool(getattr(p, "dark_mode", False)),
         }
     finally:
         db.close()
@@ -457,6 +588,9 @@ def save_profile(data: ProfileData, request: Request):
                 user_id=user.id, cv=main_cv, cover_letter=main_cl, goals=data.goals,
                 cvs_json=json.dumps(data.cvs), cover_letters_json=json.dumps(data.cover_letters),
                 language=data.language,
+                smtp_email=data.smtp_email, smtp_password=data.smtp_password,
+                smtp_host=data.smtp_host, smtp_port=data.smtp_port,
+                dark_mode=data.dark_mode,
             )
             db.add(p)
         else:
@@ -466,6 +600,15 @@ def save_profile(data: ProfileData, request: Request):
             p.cvs_json = json.dumps(data.cvs)
             p.cover_letters_json = json.dumps(data.cover_letters)
             p.language = data.language
+            if data.smtp_email:
+                p.smtp_email = data.smtp_email
+            if data.smtp_password:
+                p.smtp_password = data.smtp_password
+            if data.smtp_host:
+                p.smtp_host = data.smtp_host
+            if data.smtp_port:
+                p.smtp_port = data.smtp_port
+            p.dark_mode = data.dark_mode
         db.commit()
         return {"status": "ok"}
     finally:
@@ -1645,3 +1788,835 @@ def delete_application(app_id: int, request: Request):
         return {"status": "deleted"}
     finally:
         db.close()
+
+
+# --- CV Tailoring ---
+class CVTailorRequest(BaseModel):
+    job_url: str = ""
+    job_description: str = ""
+    job_title: str = ""
+    company: str = ""
+
+
+@app.post("/api/cv/tailor")
+def tailor_cv(req: CVTailorRequest, request: Request):
+    user = require_user(request)
+    db = SessionLocal()
+    try:
+        profile = db.query(Profile).filter(Profile.user_id == user.id).first()
+    finally:
+        db.close()
+    if not profile or not profile.cv:
+        raise HTTPException(400, "Veuillez d'abord compléter votre profil avec votre CV.")
+
+    job_desc = req.job_description
+    if not job_desc and req.job_url:
+        job_desc = fetch_job_description(req.job_url)
+
+    cv_text = profile.cv or ""
+    try:
+        cvs_list = json.loads(profile.cvs_json or "[]")
+        if cvs_list:
+            cv_text = cvs_list[0].get("content", cv_text)
+    except Exception:
+        pass
+
+    prompt = f"""Tu es un expert en optimisation de CV pour les systèmes ATS et les recruteurs.
+
+CV actuel du candidat:
+{cv_text[:3000]}
+
+Offre d'emploi: {req.job_title} chez {req.company}
+Description du poste:
+{(job_desc or 'Non disponible')[:2500]}
+
+Analyse le CV et l'offre d'emploi, puis retourne un JSON avec:
+1. "tailored_cv": version optimisée du CV qui met en avant les expériences et compétences pertinentes pour ce poste (garde le contenu véridique)
+2. "changes_made": liste de modifications effectuées et pourquoi (array of strings)
+3. "keyword_matches": mots-clés de l'offre trouvés dans le CV (array of strings)
+4. "missing_keywords": mots-clés importants de l'offre absents du CV (array of strings)
+
+Réponds UNIQUEMENT en JSON valide."""
+
+    try:
+        resp = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.3, max_tokens=3000,
+        )
+        content = resp.choices[0].message.content.strip()
+        start = content.find("{")
+        end = content.rfind("}") + 1
+        if start >= 0 and end > start:
+            result = json.loads(content[start:end])
+            return result
+        raise ValueError("No JSON found")
+    except json.JSONDecodeError:
+        return {"tailored_cv": cv_text, "changes_made": [], "keyword_matches": [], "missing_keywords": [], "error": "Impossible de parser la réponse IA."}
+    except Exception as e:
+        logger.error(f"CV tailor error: {e}")
+        raise HTTPException(500, "Erreur lors de l'optimisation du CV.")
+
+
+# --- ATS Score ---
+class ATSScoreRequest(BaseModel):
+    job_url: str = ""
+    job_description: str = ""
+
+
+@app.post("/api/cv/ats-score")
+def ats_score(req: ATSScoreRequest, request: Request):
+    user = require_user(request)
+    db = SessionLocal()
+    try:
+        profile = db.query(Profile).filter(Profile.user_id == user.id).first()
+    finally:
+        db.close()
+    if not profile or not profile.cv:
+        raise HTTPException(400, "Veuillez d'abord compléter votre profil avec votre CV.")
+
+    job_desc = req.job_description
+    if not job_desc and req.job_url:
+        job_desc = fetch_job_description(req.job_url)
+
+    cv_text = profile.cv or ""
+    try:
+        cvs_list = json.loads(profile.cvs_json or "[]")
+        if cvs_list:
+            cv_text = cvs_list[0].get("content", cv_text)
+    except Exception:
+        pass
+
+    prompt = f"""Tu es un système ATS (Applicant Tracking System) réaliste. Analyse ce CV par rapport à l'offre d'emploi.
+
+CV:
+{cv_text[:3000]}
+
+Description du poste:
+{(job_desc or 'Offre non disponible')[:2500]}
+
+Évalue comme un vrai ATS et retourne un JSON avec:
+1. "score": note de 0 à 100 (sois réaliste, la plupart des CV obtiennent entre 30-70)
+2. "keyword_analysis": {{"found": ["mot-clé1", ...], "missing": ["mot-clé2", ...]}}
+3. "format_tips": liste de conseils de formatage pour améliorer la lisibilité ATS (array of strings)
+4. "improvement_suggestions": liste de suggestions concrètes d'amélioration (array of strings)
+
+Réponds UNIQUEMENT en JSON valide."""
+
+    try:
+        resp = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.3, max_tokens=2000,
+        )
+        content = resp.choices[0].message.content.strip()
+        start = content.find("{")
+        end = content.rfind("}") + 1
+        if start >= 0 and end > start:
+            return json.loads(content[start:end])
+        raise ValueError("No JSON found")
+    except json.JSONDecodeError:
+        return {"score": 50, "keyword_analysis": {"found": [], "missing": []}, "format_tips": [], "improvement_suggestions": [], "error": "Impossible de parser la réponse IA."}
+    except Exception as e:
+        logger.error(f"ATS score error: {e}")
+        raise HTTPException(500, "Erreur lors du calcul du score ATS.")
+
+
+# --- Interview Prep ---
+class InterviewPrepRequest(BaseModel):
+    job_title: str = ""
+    company: str = ""
+    job_description: str = ""
+    job_url: str = ""
+
+
+class InterviewSimulateRequest(BaseModel):
+    job_title: str = ""
+    company: str = ""
+    user_answer: str = ""
+    question_index: int = 0
+    conversation_history: list = []
+
+
+@app.post("/api/interview/prepare")
+def interview_prepare(req: InterviewPrepRequest, request: Request):
+    user = require_user(request)
+    db = SessionLocal()
+    try:
+        profile = db.query(Profile).filter(Profile.user_id == user.id).first()
+    finally:
+        db.close()
+
+    cv_text = ""
+    if profile and profile.cv:
+        cv_text = profile.cv
+
+    job_desc = req.job_description
+    if not job_desc and req.job_url:
+        job_desc = fetch_job_description(req.job_url)
+
+    prompt = f"""Tu es un coach d'entretien d'embauche expert. Prépare le candidat pour un entretien.
+
+CV du candidat:
+{cv_text[:2000]}
+
+Poste: {req.job_title} chez {req.company}
+Description: {(job_desc or 'Non disponible')[:2000]}
+
+Génère un JSON avec:
+1. "questions": tableau de 8-10 questions probables (mix de comportementales, techniques, situationnelles). Chaque question: {{"type": "behavioral"|"technical"|"situational", "question": "..."}}
+2. "suggested_answers": tableau de réponses suggérées basées sur le CV du candidat (même longueur que questions). Chaque réponse: {{"question_index": 0, "answer": "..."}}
+3. "company_research_tips": liste de conseils pour se renseigner sur l'entreprise (array of strings)
+4. "salary_range_estimate": estimation de fourchette salariale pour ce poste (string, ex: "35 000€ - 45 000€ brut annuel")
+
+Réponds UNIQUEMENT en JSON valide."""
+
+    try:
+        resp = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.5, max_tokens=3000,
+        )
+        content = resp.choices[0].message.content.strip()
+        start = content.find("{")
+        end = content.rfind("}") + 1
+        if start >= 0 and end > start:
+            return json.loads(content[start:end])
+        raise ValueError("No JSON found")
+    except json.JSONDecodeError:
+        return {"questions": [], "suggested_answers": [], "company_research_tips": [], "salary_range_estimate": "", "error": "Impossible de parser la réponse IA."}
+    except Exception as e:
+        logger.error(f"Interview prep error: {e}")
+        raise HTTPException(500, "Erreur lors de la préparation de l'entretien.")
+
+
+@app.post("/api/interview/simulate")
+def interview_simulate(req: InterviewSimulateRequest, request: Request):
+    user = require_user(request)
+    db = SessionLocal()
+    try:
+        profile = db.query(Profile).filter(Profile.user_id == user.id).first()
+    finally:
+        db.close()
+
+    cv_text = ""
+    if profile and profile.cv:
+        cv_text = profile.cv[:1500]
+
+    history_text = ""
+    for h in (req.conversation_history or [])[-6:]:
+        role = h.get("role", "")
+        content = h.get("content", "")
+        history_text += f"{role}: {content}\n"
+
+    prompt = f"""Tu es un recruteur expérimenté conduisant un entretien pour le poste de {req.job_title} chez {req.company}.
+
+CV du candidat: {cv_text}
+
+Historique de la conversation:
+{history_text}
+
+Le candidat vient de répondre à la question #{req.question_index + 1}:
+"{req.user_answer}"
+
+Évalue la réponse et retourne un JSON avec:
+1. "feedback": feedback constructif sur la réponse (string)
+2. "score": note de 1 à 10 (number)
+3. "next_question": prochaine question de suivi (string)
+4. "tips": conseils d'amélioration (array of strings)
+
+Réponds UNIQUEMENT en JSON valide."""
+
+    try:
+        resp = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.5, max_tokens=1500,
+        )
+        content = resp.choices[0].message.content.strip()
+        start = content.find("{")
+        end = content.rfind("}") + 1
+        if start >= 0 and end > start:
+            return json.loads(content[start:end])
+        raise ValueError("No JSON found")
+    except json.JSONDecodeError:
+        return {"feedback": "", "score": 5, "next_question": "", "tips": [], "error": "Impossible de parser la réponse IA."}
+    except Exception as e:
+        logger.error(f"Interview simulate error: {e}")
+        raise HTTPException(500, "Erreur lors de la simulation d'entretien.")
+
+
+# --- Email System ---
+class SendEmailRequest(BaseModel):
+    to_email: str
+    subject: str
+    body: str
+    application_id: int = 0
+
+
+class ScheduleFollowupRequest(BaseModel):
+    application_id: int
+    delay_days: int = 7
+    subject: str = ""
+    body: str = ""
+
+
+@app.post("/api/email/send")
+def send_email(req: SendEmailRequest, request: Request):
+    user = require_user(request)
+    db = SessionLocal()
+    try:
+        profile = db.query(Profile).filter(Profile.user_id == user.id).first()
+        if not profile or not profile.smtp_email or not profile.smtp_password:
+            raise HTTPException(400, "Veuillez configurer vos paramètres SMTP dans votre profil.")
+        try:
+            _send_email(
+                profile.smtp_email, profile.smtp_password,
+                profile.smtp_host or "smtp.gmail.com", profile.smtp_port or 587,
+                req.to_email, req.subject, req.body,
+            )
+        except Exception as e:
+            logger.error(f"Email send error: {e}")
+            raise HTTPException(500, f"Erreur d'envoi: {e}")
+
+        # Save to history
+        eh = EmailHistory(
+            user_id=user.id, to_email=req.to_email, subject=req.subject,
+            body=req.body, application_id=req.application_id if req.application_id else None,
+        )
+        db.add(eh)
+
+        # Update application status if provided
+        if req.application_id:
+            app_entry = db.query(Application).filter(
+                Application.id == req.application_id, Application.user_id == user.id
+            ).first()
+            if app_entry:
+                app_entry.status = "sent"
+                app_entry.updated_at = datetime.utcnow()
+
+        db.commit()
+        return {"status": "sent"}
+    finally:
+        db.close()
+
+
+@app.post("/api/email/schedule-followup")
+def schedule_followup(req: ScheduleFollowupRequest, request: Request):
+    user = require_user(request)
+    db = SessionLocal()
+    try:
+        app_entry = db.query(Application).filter(
+            Application.id == req.application_id, Application.user_id == user.id
+        ).first()
+        if not app_entry:
+            raise HTTPException(404, "Candidature non trouvée.")
+        send_at = datetime.utcnow() + timedelta(days=req.delay_days)
+        followup = ScheduledFollowup(
+            user_id=user.id, application_id=req.application_id,
+            send_at=send_at, subject=req.subject, body=req.body,
+        )
+        db.add(followup)
+        db.commit()
+        db.refresh(followup)
+        return {
+            "id": followup.id,
+            "application_id": followup.application_id,
+            "send_at": followup.send_at.isoformat(),
+            "subject": followup.subject,
+            "body": followup.body,
+            "sent": followup.sent,
+        }
+    finally:
+        db.close()
+
+
+@app.get("/api/emails")
+def get_emails(request: Request):
+    user = require_user(request)
+    db = SessionLocal()
+    try:
+        emails = db.query(EmailHistory).filter(
+            EmailHistory.user_id == user.id
+        ).order_by(EmailHistory.sent_at.desc()).limit(50).all()
+        return [
+            {
+                "id": e.id,
+                "to_email": e.to_email,
+                "subject": e.subject,
+                "body": e.body,
+                "application_id": e.application_id,
+                "sent_at": e.sent_at.isoformat() if e.sent_at else "",
+            }
+            for e in emails
+        ]
+    finally:
+        db.close()
+
+
+# --- Analytics ---
+@app.get("/api/analytics")
+def get_analytics(request: Request):
+    user = require_user(request)
+    db = SessionLocal()
+    try:
+        # Applications per week (last 8 weeks)
+        now = datetime.utcnow()
+        applications = db.query(Application).filter(Application.user_id == user.id).all()
+        weeks_data = []
+        for i in range(7, -1, -1):
+            week_start = now - timedelta(weeks=i + 1)
+            week_end = now - timedelta(weeks=i)
+            count = sum(1 for a in applications if a.applied_at and week_start <= a.applied_at < week_end)
+            weeks_data.append({"week": (now - timedelta(weeks=i)).strftime("%d/%m"), "count": count})
+
+        # Response rate
+        total_apps = len(applications)
+        responded = sum(1 for a in applications if a.status not in ("waiting", "sent"))
+        response_rate = round((responded / total_apps * 100) if total_apps > 0 else 0, 1)
+
+        # Average score of saved jobs
+        saved_jobs = db.query(SavedJob).filter(SavedJob.user_id == user.id).all()
+        scores = [j.score for j in saved_jobs if j.score and j.score > 0]
+        avg_score = round(sum(scores) / len(scores), 1) if scores else 0
+
+        # Platform breakdown
+        platform_breakdown = {}
+        for j in saved_jobs:
+            p = j.platform or "Autre"
+            platform_breakdown[p] = platform_breakdown.get(p, 0) + 1
+
+        # Status distribution
+        status_distribution = {}
+        for a in applications:
+            status_distribution[a.status] = status_distribution.get(a.status, 0) + 1
+
+        # Top companies
+        company_counts = {}
+        for a in applications:
+            if a.company:
+                company_counts[a.company] = company_counts.get(a.company, 0) + 1
+        top_companies = sorted(company_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+        top_companies = [{"company": c, "count": n} for c, n in top_companies]
+
+        # Weekly trend
+        last_4 = [w["count"] for w in weeks_data[-4:]]
+        if len(last_4) >= 2:
+            if last_4[-1] > last_4[0]:
+                weekly_trend = "improving"
+            elif last_4[-1] < last_4[0]:
+                weekly_trend = "declining"
+            else:
+                weekly_trend = "stable"
+        else:
+            weekly_trend = "stable"
+
+        # AI insights
+        ai_insights = []
+        try:
+            insight_prompt = f"""Tu es un coach carrière. Voici les statistiques de recherche d'emploi d'un candidat:
+- Candidatures totales: {total_apps}
+- Taux de réponse: {response_rate}%
+- Score moyen des offres sauvegardées: {avg_score}/10
+- Distribution des statuts: {json.dumps(status_distribution)}
+- Tendance hebdomadaire: {weekly_trend}
+- Top entreprises: {json.dumps([c['company'] for c in top_companies])}
+
+Donne 2-3 conseils personnalisés et concrets en français pour améliorer sa recherche.
+Réponds UNIQUEMENT en JSON: un tableau de strings. Exemple: ["conseil1", "conseil2"]"""
+            resp = groq_client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[{"role": "user", "content": insight_prompt}],
+                temperature=0.5, max_tokens=500,
+            )
+            content = resp.choices[0].message.content.strip()
+            start = content.find("[")
+            end = content.rfind("]") + 1
+            if start >= 0 and end > start:
+                ai_insights = json.loads(content[start:end])
+        except Exception as e:
+            logger.warning(f"Analytics AI insights error: {e}")
+            ai_insights = ["Continuez vos efforts de candidature !"]
+
+        return {
+            "applications_per_week": weeks_data,
+            "response_rate": response_rate,
+            "avg_score": avg_score,
+            "platform_breakdown": platform_breakdown,
+            "status_distribution": status_distribution,
+            "top_companies": top_companies,
+            "weekly_trend": weekly_trend,
+            "ai_insights": ai_insights,
+        }
+    finally:
+        db.close()
+
+
+# --- Networking Messages ---
+class NetworkingMessageRequest(BaseModel):
+    person_name: str = ""
+    person_title: str = ""
+    person_company: str = ""
+    context: str = ""
+
+
+@app.post("/api/networking/message")
+def generate_networking_message(req: NetworkingMessageRequest, request: Request):
+    user = require_user(request)
+    db = SessionLocal()
+    try:
+        profile = db.query(Profile).filter(Profile.user_id == user.id).first()
+    finally:
+        db.close()
+
+    cv_text = ""
+    lang = "fr"
+    if profile:
+        cv_text = profile.cv or ""
+        lang = profile.language or "fr"
+
+    prompt = f"""Tu es un expert en networking professionnel.
+
+CV du candidat:
+{cv_text[:1500]}
+
+Personne à contacter:
+- Nom: {req.person_name}
+- Titre: {req.person_title}
+- Entreprise: {req.person_company}
+- Contexte: {req.context or "Aucun contexte particulier"}
+
+Génère 3 messages d'approche différents en {"français" if lang == "fr" else "anglais"}:
+1. Formel (professionnel et respectueux)
+2. Décontracté (amical mais professionnel)
+3. Direct (droit au but, efficace)
+
+Chaque message doit être court (3-5 phrases), personnalisé avec les infos du CV et de la personne.
+
+Réponds UNIQUEMENT en JSON valide:
+[{{"tone": "formal", "text": "..."}}, {{"tone": "casual", "text": "..."}}, {{"tone": "direct", "text": "..."}}]"""
+
+    try:
+        resp = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7, max_tokens=1500,
+        )
+        content = resp.choices[0].message.content.strip()
+        start = content.find("[")
+        end = content.rfind("]") + 1
+        if start >= 0 and end > start:
+            messages = json.loads(content[start:end])
+            return {"messages": messages}
+        raise ValueError("No JSON found")
+    except json.JSONDecodeError:
+        return {"messages": [], "error": "Impossible de parser la réponse IA."}
+    except Exception as e:
+        logger.error(f"Networking message error: {e}")
+        raise HTTPException(500, "Erreur lors de la génération des messages.")
+
+
+# --- Share Profile ---
+@app.post("/api/profile/share")
+def share_profile(request: Request):
+    user = require_user(request)
+    db = SessionLocal()
+    try:
+        profile = db.query(Profile).filter(Profile.user_id == user.id).first()
+        if not profile:
+            raise HTTPException(404, "Profil non trouvé.")
+        token = str(uuid.uuid4())
+        profile.share_token = token
+        db.commit()
+        return {"share_url": f"/shared/{token}"}
+    finally:
+        db.close()
+
+
+@app.get("/api/shared/{token}")
+def get_shared_profile(token: str):
+    db = SessionLocal()
+    try:
+        profile = db.query(Profile).filter(Profile.share_token == token).first()
+        if not profile:
+            raise HTTPException(404, "Profil partagé non trouvé.")
+        user = db.query(User).filter(User.id == profile.user_id).first()
+
+        cv_text = profile.cv or ""
+        try:
+            cvs_list = json.loads(profile.cvs_json or "[]")
+            if cvs_list:
+                cv_text = cvs_list[0].get("content", cv_text)
+        except Exception:
+            pass
+
+        # Completion score
+        score = 0
+        if profile.cv and profile.cv.strip():
+            score += 30
+        if profile.cover_letter and profile.cover_letter.strip():
+            score += 30
+        if profile.goals and profile.goals.strip():
+            score += 20
+
+        # Saved jobs titles
+        saved = db.query(SavedJob).filter(SavedJob.user_id == profile.user_id).all()
+        saved_titles = [j.title for j in saved]
+
+        # Applications summary
+        apps = db.query(Application).filter(Application.user_id == profile.user_id).all()
+        apps_summary = {"total": len(apps)}
+        for a in apps:
+            apps_summary[a.status] = apps_summary.get(a.status, 0) + 1
+
+        return {
+            "name": user.name if user else "",
+            "cv_text": cv_text,
+            "goals": profile.goals or "",
+            "completion_score": score,
+            "saved_jobs": saved_titles,
+            "applications_summary": apps_summary,
+        }
+    finally:
+        db.close()
+
+
+@app.delete("/api/profile/share")
+def delete_share_profile(request: Request):
+    user = require_user(request)
+    db = SessionLocal()
+    try:
+        profile = db.query(Profile).filter(Profile.user_id == user.id).first()
+        if profile:
+            profile.share_token = None
+            db.commit()
+        return {"status": "ok"}
+    finally:
+        db.close()
+
+
+# --- LinkedIn Import ---
+class LinkedInImportRequest(BaseModel):
+    linkedin_url: str
+
+
+@app.post("/api/profile/import-linkedin")
+def import_linkedin(req: LinkedInImportRequest, request: Request):
+    user = require_user(request)
+    if not req.linkedin_url or "linkedin.com" not in req.linkedin_url:
+        raise HTTPException(400, "URL LinkedIn invalide.")
+
+    resp = safe_request(req.linkedin_url)
+    if not resp or resp.status_code != 200:
+        raise HTTPException(400, "Impossible d'accéder à la page LinkedIn.")
+
+    soup = BeautifulSoup(resp.content, "lxml")
+    for tag in soup(["script", "style", "nav", "header", "footer"]):
+        tag.decompose()
+
+    # Extract key sections
+    extracted_parts = []
+
+    # Name
+    name_el = soup.find("h1")
+    if name_el:
+        extracted_parts.append(f"Nom: {name_el.get_text(strip=True)}")
+
+    # Headline
+    headline_el = soup.find("div", class_="top-card-layout__headline") or soup.find("h2")
+    if headline_el:
+        extracted_parts.append(f"Titre: {headline_el.get_text(strip=True)}")
+
+    # About / Summary
+    about_section = soup.find("section", class_="summary") or soup.find("div", {"class": re.compile(r"summary|about", re.I)})
+    if about_section:
+        extracted_parts.append(f"À propos: {about_section.get_text(separator=' ', strip=True)[:500]}")
+
+    # Experience
+    exp_section = soup.find("section", {"class": re.compile(r"experience", re.I)})
+    if exp_section:
+        extracted_parts.append(f"Expérience: {exp_section.get_text(separator=' ', strip=True)[:1000]}")
+
+    # Fallback: get body text
+    if not extracted_parts:
+        body = soup.find("body")
+        if body:
+            extracted_parts.append(body.get_text(separator="\n", strip=True)[:2000])
+
+    extracted_text = "\n\n".join(extracted_parts)
+
+    if not extracted_text.strip():
+        raise HTTPException(400, "Impossible d'extraire des informations de cette page LinkedIn.")
+
+    # Use Groq to format into CV
+    try:
+        format_resp = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{
+                "role": "user",
+                "content": f"""Voici des informations extraites d'un profil LinkedIn:
+
+{extracted_text[:3000]}
+
+Formate ces informations en un CV propre et structuré avec les sections:
+- Informations personnelles
+- Résumé professionnel
+- Expérience professionnelle
+- Formation
+- Compétences
+
+Réponds UNIQUEMENT avec le CV formaté, sans commentaire.""",
+            }],
+            temperature=0.2, max_tokens=2000,
+        )
+        formatted_cv = format_resp.choices[0].message.content.strip()
+    except Exception as e:
+        logger.warning(f"Groq LinkedIn format error: {e}")
+        formatted_cv = extracted_text
+
+    # Save as new CV version
+    db = SessionLocal()
+    try:
+        profile = db.query(Profile).filter(Profile.user_id == user.id).first()
+        if profile:
+            try:
+                cvs_list = json.loads(profile.cvs_json or "[]")
+            except Exception:
+                cvs_list = []
+            cvs_list.append({"name": "LinkedIn Import", "content": formatted_cv})
+            profile.cvs_json = json.dumps(cvs_list)
+            if not profile.cv or not profile.cv.strip():
+                profile.cv = formatted_cv
+            db.commit()
+    finally:
+        db.close()
+
+    return {"extracted_text": extracted_text, "formatted_cv": formatted_cv}
+
+
+# --- Export PDF ---
+@app.get("/api/export/cv")
+def export_cv_pdf(request: Request, version: int = 0, tailored: bool = False, job: str = ""):
+    user = require_user(request)
+    db = SessionLocal()
+    try:
+        profile = db.query(Profile).filter(Profile.user_id == user.id).first()
+    finally:
+        db.close()
+    if not profile or not profile.cv:
+        raise HTTPException(400, "Aucun CV à exporter.")
+
+    cv_text = profile.cv or ""
+    try:
+        cvs_list = json.loads(profile.cvs_json or "[]")
+        if cvs_list and version < len(cvs_list):
+            cv_text = cvs_list[version].get("content", cv_text)
+    except Exception:
+        pass
+
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+        from reportlab.lib.units import cm
+        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
+
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=2 * cm, rightMargin=2 * cm, topMargin=2 * cm, bottomMargin=2 * cm)
+        styles = getSampleStyleSheet()
+        heading_style = ParagraphStyle("CVHeading", parent=styles["Heading1"], fontSize=14, spaceAfter=10)
+        section_style = ParagraphStyle("CVSection", parent=styles["Heading2"], fontSize=11, spaceAfter=6, spaceBefore=12)
+        body_style = ParagraphStyle("CVBody", parent=styles["Normal"], fontSize=10, spaceAfter=4, leading=14)
+
+        story = []
+        user_db = None
+        db2 = SessionLocal()
+        try:
+            user_db = db2.query(User).filter(User.id == user.id).first()
+        finally:
+            db2.close()
+
+        story.append(Paragraph(user_db.name if user_db else "CV", heading_style))
+        story.append(Spacer(1, 0.3 * cm))
+
+        # Parse CV text into sections
+        lines = cv_text.split("\n")
+        for line in lines:
+            line = line.strip()
+            if not line:
+                story.append(Spacer(1, 0.2 * cm))
+                continue
+            # Escape XML special chars for reportlab
+            safe_line = line.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            if line.startswith("#") or line.isupper() or (len(line) < 60 and line.endswith(":")):
+                clean = safe_line.lstrip("#").strip().rstrip(":")
+                if clean:
+                    story.append(Paragraph(clean, section_style))
+            else:
+                story.append(Paragraph(safe_line, body_style))
+
+        doc.build(story)
+        buffer.seek(0)
+
+        from fastapi.responses import StreamingResponse
+        return StreamingResponse(
+            buffer, media_type="application/pdf",
+            headers={"Content-Disposition": "attachment; filename=cv.pdf"},
+        )
+    except ImportError:
+        raise HTTPException(500, "reportlab n'est pas installé. Ajoutez-le avec: pip install reportlab")
+    except Exception as e:
+        logger.error(f"PDF export error: {e}")
+        raise HTTPException(500, "Erreur lors de la génération du PDF.")
+
+
+@app.get("/api/export/letter/{letter_id}")
+def export_letter_pdf(letter_id: int, request: Request):
+    user = require_user(request)
+    db = SessionLocal()
+    try:
+        letter = db.query(GeneratedLetter).filter(
+            GeneratedLetter.id == letter_id, GeneratedLetter.user_id == user.id
+        ).first()
+        if not letter:
+            raise HTTPException(404, "Lettre non trouvée.")
+        letter_content = letter.content
+        letter_title = f"{letter.job_title} - {letter.company}"
+    finally:
+        db.close()
+
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+        from reportlab.lib.units import cm
+        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
+
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=2.5 * cm, rightMargin=2.5 * cm, topMargin=2.5 * cm, bottomMargin=2.5 * cm)
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle("LetterTitle", parent=styles["Heading1"], fontSize=13, spaceAfter=12)
+        body_style = ParagraphStyle("LetterBody", parent=styles["Normal"], fontSize=10, spaceAfter=6, leading=14)
+
+        story = []
+        story.append(Paragraph(letter_title.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"), title_style))
+        story.append(Spacer(1, 0.5 * cm))
+
+        for line in letter_content.split("\n"):
+            safe_line = line.strip().replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            if not safe_line:
+                story.append(Spacer(1, 0.3 * cm))
+            else:
+                story.append(Paragraph(safe_line, body_style))
+
+        doc.build(story)
+        buffer.seek(0)
+
+        from fastapi.responses import StreamingResponse
+        return StreamingResponse(
+            buffer, media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename=lettre_{letter_id}.pdf"},
+        )
+    except ImportError:
+        raise HTTPException(500, "reportlab n'est pas installé.")
+    except Exception as e:
+        logger.error(f"Letter PDF export error: {e}")
+        raise HTTPException(500, "Erreur lors de la génération du PDF.")

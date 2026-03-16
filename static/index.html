@@ -8,6 +8,7 @@
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
 :root{
@@ -205,6 +206,76 @@ html[data-lang="en"] .sidebar-logo{background:linear-gradient(135deg,#e84393,#fd
 html[data-lang="en"] .login-page{background:linear-gradient(135deg,#2d1b35 0%,#3d1f47 100%)}
 html[data-lang="en"] .google-btn:hover{border-color:#e84393;box-shadow:0 2px 8px rgba(232,67,147,0.15)}
 html[data-lang="en"] .stat-number{color:#e84393}
+/* ---- DARK MODE ---- */
+[data-theme="dark"]{
+--sidebar-bg:#0f3460;--sidebar-active:#fff;--sidebar-inactive:#8899aa;
+--main-bg:#1a1a2e;--card-bg:#16213e;--accent:#7c5cfc;--success:#22c55e;
+--warning:#f59e0b;--danger:#ef4444;--text-primary:#e0e0e0;--text-secondary:#a0a0a0;
+--border:#2a2a4a;--shadow:0 2px 12px rgba(0,0,0,0.2);
+}
+[data-theme="dark"] .input,[data-theme="dark"] .textarea{background:#1e2a4a;color:#e0e0e0;border-color:#2a2a4a}
+[data-theme="dark"] select.input{background-color:#1e2a4a;color:#e0e0e0}
+[data-theme="dark"] .login-page{background:#1a1a2e}
+[data-theme="dark"] .login-card{background:#16213e;color:#e0e0e0}
+[data-theme="dark"] .login-card .input{background:#1e2a4a;color:#e0e0e0;border-color:#2a2a4a}
+[data-theme="dark"] .google-btn{background:#1e2a4a;color:#e0e0e0;border-color:#2a2a4a}
+[data-theme="dark"] .sort-btn{background:#1e2a4a;color:#a0a0a0;border-color:#2a2a4a}
+[data-theme="dark"] .toggle-btn{background:#1e2a4a;color:#a0a0a0;border-color:#2a2a4a}
+[data-theme="dark"] .btn-outline{color:#e0e0e0;border-color:#2a2a4a}
+[data-theme="dark"] .btn-outline:hover{border-color:#7c5cfc;color:#7c5cfc}
+[data-theme="dark"] .file-upload{border-color:#2a2a4a}
+[data-theme="dark"] .file-upload:hover{border-color:#7c5cfc;background:rgba(124,92,252,0.06)}
+[data-theme="dark"] .chat-panel{background:#16213e}
+[data-theme="dark"] .chat-msg.ai{background:#1e2a4a;color:#e0e0e0}
+[data-theme="dark"] .chat-input-area{border-top-color:#2a2a4a}
+[data-theme="dark"] .chat-input-area input{background:#1e2a4a;color:#e0e0e0;border-color:#2a2a4a}
+[data-theme="dark"] .kanban-column{background:#1a1a2e}
+[data-theme="dark"] .kanban-card{background:#16213e}
+[data-theme="dark"] .people-table th{background:#0f3460}
+[data-theme="dark"] .people-table td{border-bottom-color:#2a2a4a}
+[data-theme="dark"] .banner-info{background:#1e2a4a;color:#93c5fd;border-color:#2a2a4a}
+[data-theme="dark"] .banner-warning{background:#2a2000;color:#fde68a;border-color:#4a3a00}
+[data-theme="dark"] .stat-card{background:#16213e}
+[data-theme="dark"] .recap-item{border-bottom-color:#2a2a4a}
+/* Dark mode toggle switch */
+.dark-toggle{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--sidebar-inactive);padding:8px 24px}
+.dark-toggle:hover{color:#fff}
+.dark-toggle svg{width:18px;height:18px}
+/* CV Tailor styles */
+.diff-view{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.diff-panel{border:1px solid var(--border);border-radius:var(--radius-btn);padding:16px;font-size:13px;line-height:1.8;white-space:pre-wrap;max-height:400px;overflow-y:auto;background:var(--card-bg)}
+.diff-panel .highlight{background:rgba(108,99,255,0.15);border-radius:2px;padding:0 2px}
+.badge-green{display:inline-block;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:500;background:#d1fae5;color:#065f46;margin:2px}
+.badge-red{display:inline-block;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:500;background:#fee2e2;color:#991b1b;margin:2px}
+[data-theme="dark"] .badge-green{background:#064e3b;color:#6ee7b7}
+[data-theme="dark"] .badge-red{background:#450a0a;color:#fca5a5}
+[data-theme="dark"] .diff-panel{background:#1e2a4a;border-color:#2a2a4a}
+/* ATS score circle */
+.ats-circle{width:120px;height:120px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:700;font-family:'Plus Jakarta Sans',sans-serif;margin:0 auto 16px;position:relative}
+.ats-circle::before{content:'';position:absolute;inset:0;border-radius:50%;border:8px solid var(--border)}
+.ats-circle.ats-red{color:var(--danger)}.ats-circle.ats-red::before{border-color:var(--danger)}
+.ats-circle.ats-orange{color:var(--warning)}.ats-circle.ats-orange::before{border-color:var(--warning)}
+.ats-circle.ats-green{color:var(--success)}.ats-circle.ats-green::before{border-color:var(--success)}
+/* Interview chat */
+.interview-chat{display:flex;flex-direction:column;gap:12px;margin-bottom:16px}
+.interview-msg{max-width:85%;padding:12px 16px;border-radius:12px;font-size:14px;line-height:1.6}
+.interview-msg.ai{background:var(--main-bg);align-self:flex-start;border-bottom-left-radius:4px}
+.interview-msg.user{background:var(--accent);color:#fff;align-self:flex-end;border-bottom-right-radius:4px}
+[data-theme="dark"] .interview-msg.ai{background:#1e2a4a}
+/* Email styles */
+.email-item{display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid var(--border)}
+.email-item:last-child{border-bottom:none}
+/* Analytics chart container */
+.chart-container{position:relative;height:300px;width:100%}
+/* Share link */
+.share-link{display:flex;gap:8px;align-items:center;margin-top:12px}
+.share-link input{flex:1}
+/* Networking message modal */
+.msg-options{display:flex;flex-direction:column;gap:12px;margin-top:12px}
+.msg-option{border:1px solid var(--border);border-radius:var(--radius-btn);padding:12px;position:relative}
+.msg-option-label{font-size:12px;font-weight:600;color:var(--accent);margin-bottom:6px;text-transform:uppercase}
+.msg-option-text{font-size:13px;line-height:1.6;white-space:pre-wrap}
+.msg-option .copy-btn{position:absolute;top:8px;right:8px}
 /* ---- RESPONSIVE ---- */
 @media(max-width:768px){
   .sidebar{position:fixed;left:-260px;width:260px;transition:left .3s ease;z-index:200}
@@ -227,6 +298,9 @@ html[data-lang="en"] .stat-number{color:#e84393}
   .quick-actions{grid-template-columns:1fr !important}
   .kanban-board{flex-direction:column}
   .kanban-column{min-width:unset}
+  .diff-view{grid-template-columns:1fr}
+  .chart-container{height:220px}
+  .ats-circle{width:90px;height:90px;font-size:24px}
 }
 @media(min-width:769px){
   .mobile-header{display:none}
@@ -326,6 +400,52 @@ const translations = {
     completionHigh: 'Profil presque complet', completionFull: 'Profil complet !',
     // Mark as sent
     markAsSent: 'Marquer comme candidature envoyée',
+    // CV Tailor
+    cvTailor: 'Adapter CV', cvTailorTitle: 'Adapter mon CV', jobUrl: 'URL de l\'offre', jobTitleLabel: 'Titre du poste',
+    companyLabel: 'Entreprise', analyzeAdapt: 'Analyser et adapter', analyzing: 'Analyse en cours...',
+    originalCV: 'CV Original', tailoredCV: 'CV Adapté', changesMade: 'Modifications apportées',
+    keywordsMatched: 'Mots-clés trouvés', keywordsMissing: 'Mots-clés manquants',
+    copyTailoredCV: 'Copier le CV adapté', exportPdf: 'Exporter en PDF', cvCopied: 'CV copié ✓',
+    // ATS Score
+    atsScore: 'Score ATS', atsScoreTitle: 'Score ATS', checkAtsScore: 'Vérifier le score ATS',
+    atsFormatTips: 'Conseils de format', atsImprovements: 'Suggestions d\'amélioration',
+    // Interview
+    interview: 'Entretien', interviewTitle: 'Préparation d\'entretien', prepareMode: 'Préparer',
+    simulateMode: 'Simuler', generateQuestions: 'Générer les questions', generatingQuestions: 'Génération...',
+    suggestedAnswer: 'Réponse suggérée', companyTips: 'Conseils sur l\'entreprise',
+    salaryEstimate: 'Estimation salaire', startSimulation: 'Commencer la simulation',
+    yourAnswer: 'Votre réponse...', submitAnswer: 'Envoyer', nextQuestion: 'Question suivante',
+    simulationComplete: 'Simulation terminée', averageScore: 'Score moyen', finalTips: 'Conseils finaux',
+    questionOf: 'Question', of: 'sur',
+    // Email
+    emailPage: 'Email', emailTitle: 'Emails', emailTo: 'Destinataire', emailSubject: 'Objet',
+    emailBody: 'Message', sendEmail: 'Envoyer', sendingEmail: 'Envoi...',
+    scheduleFollowup: 'Programmer une relance', followupDays: 'Jours avant relance',
+    emailHistory: 'Historique des emails', emailEmpty: 'Aucun email envoyé.',
+    emailSent: 'Email envoyé ✓', sendEmailBtn: 'Envoyer un email', scheduleFollowupBtn: 'Programmer une relance',
+    // Analytics
+    analytics: 'Analytics', analyticsTitle: 'Tableau de bord', responseRate: 'Taux de réponse',
+    avgScore: 'Score moyen', totalApplications: 'Candidatures totales', totalAlerts: 'Alertes totales',
+    applicationsPerWeek: 'Candidatures par semaine', statusDistribution: 'Répartition des statuts',
+    jobsPerPlatform: 'Offres par plateforme', topCompanies: 'Top entreprises',
+    aiInsights: 'Conseils IA', noDataYet: 'Pas encore de données.',
+    // Networking
+    generateMessage: 'Générer un message', messageContext: 'Contexte (optionnel)',
+    messageContextPlaceholder: 'ex: même école, recrute dans mon domaine',
+    messageFormal: 'Formel', messageCasual: 'Décontracté', messageDirect: 'Direct',
+    generatingMessages: 'Génération des messages...', copyMessage: 'Copier', messageCopied: 'Message copié ✓',
+    // Profile enhancements
+    smtpConfig: 'Configuration email', smtpEmail: 'Email SMTP', smtpPassword: 'Mot de passe SMTP',
+    smtpHost: 'Hôte SMTP', smtpPort: 'Port SMTP', shareProfile: 'Partager mon profil',
+    disableShare: 'Désactiver le partage', shareLink: 'Lien de partage', linkCopied: 'Lien copié ✓',
+    importLinkedin: 'Importer depuis LinkedIn', linkedinUrl: 'URL du profil LinkedIn',
+    importLinkedinBtn: 'Importer', importing: 'Importation...', linkedinImported: 'Profil LinkedIn importé ✓',
+    darkMode: 'Mode sombre', lightMode: 'Mode clair',
+    // Dashboard enhancements
+    cvNotOptimized: 'CV non optimisé — Adaptez votre CV pour de meilleurs résultats',
+    prepareInterview: 'Préparer un entretien',
+    // Letter enhancements
+    exportLetterPdf: 'Exporter en PDF',
   },
   en: {
     dashboard: 'Dashboard', profile: 'Profile', search: 'Search', letter: 'Letter', recap: 'Summary',
@@ -403,6 +523,52 @@ const translations = {
     completionHigh: 'Profile almost complete', completionFull: 'Profile complete!',
     // Mark as sent
     markAsSent: 'Mark as application sent',
+    // CV Tailor
+    cvTailor: 'CV Tailor', cvTailorTitle: 'Tailor my CV', jobUrl: 'Job URL', jobTitleLabel: 'Job title',
+    companyLabel: 'Company', analyzeAdapt: 'Analyze & adapt', analyzing: 'Analyzing...',
+    originalCV: 'Original CV', tailoredCV: 'Tailored CV', changesMade: 'Changes made',
+    keywordsMatched: 'Keywords matched', keywordsMissing: 'Keywords missing',
+    copyTailoredCV: 'Copy tailored CV', exportPdf: 'Export as PDF', cvCopied: 'CV copied',
+    // ATS Score
+    atsScore: 'ATS Score', atsScoreTitle: 'ATS Score', checkAtsScore: 'Check ATS score',
+    atsFormatTips: 'Format tips', atsImprovements: 'Improvement suggestions',
+    // Interview
+    interview: 'Interview', interviewTitle: 'Interview prep', prepareMode: 'Prepare',
+    simulateMode: 'Simulate', generateQuestions: 'Generate questions', generatingQuestions: 'Generating...',
+    suggestedAnswer: 'Suggested answer', companyTips: 'Company tips',
+    salaryEstimate: 'Salary estimate', startSimulation: 'Start simulation',
+    yourAnswer: 'Your answer...', submitAnswer: 'Submit', nextQuestion: 'Next question',
+    simulationComplete: 'Simulation complete', averageScore: 'Average score', finalTips: 'Final tips',
+    questionOf: 'Question', of: 'of',
+    // Email
+    emailPage: 'Email', emailTitle: 'Emails', emailTo: 'To', emailSubject: 'Subject',
+    emailBody: 'Body', sendEmail: 'Send', sendingEmail: 'Sending...',
+    scheduleFollowup: 'Schedule follow-up', followupDays: 'Days before follow-up',
+    emailHistory: 'Email history', emailEmpty: 'No emails sent yet.',
+    emailSent: 'Email sent', sendEmailBtn: 'Send an email', scheduleFollowupBtn: 'Schedule follow-up',
+    // Analytics
+    analytics: 'Analytics', analyticsTitle: 'Dashboard', responseRate: 'Response rate',
+    avgScore: 'Avg score', totalApplications: 'Total applications', totalAlerts: 'Total alerts',
+    applicationsPerWeek: 'Applications per week', statusDistribution: 'Status distribution',
+    jobsPerPlatform: 'Jobs per platform', topCompanies: 'Top companies',
+    aiInsights: 'AI insights', noDataYet: 'No data yet.',
+    // Networking
+    generateMessage: 'Generate message', messageContext: 'Context (optional)',
+    messageContextPlaceholder: 'e.g., same school, recruiting in my field',
+    messageFormal: 'Formal', messageCasual: 'Casual', messageDirect: 'Direct',
+    generatingMessages: 'Generating messages...', copyMessage: 'Copy', messageCopied: 'Message copied',
+    // Profile enhancements
+    smtpConfig: 'Email configuration', smtpEmail: 'SMTP email', smtpPassword: 'SMTP password',
+    smtpHost: 'SMTP host', smtpPort: 'SMTP port', shareProfile: 'Share my profile',
+    disableShare: 'Disable sharing', shareLink: 'Share link', linkCopied: 'Link copied',
+    importLinkedin: 'Import from LinkedIn', linkedinUrl: 'LinkedIn profile URL',
+    importLinkedinBtn: 'Import', importing: 'Importing...', linkedinImported: 'LinkedIn profile imported',
+    darkMode: 'Dark mode', lightMode: 'Light mode',
+    // Dashboard enhancements
+    cvNotOptimized: 'CV not optimized — Tailor your CV for better results',
+    prepareInterview: 'Prepare an interview',
+    // Letter enhancements
+    exportLetterPdf: 'Export as PDF',
   },
   titou: {
     dashboard: 'Dachborde', profile: 'Profeel', search: 'Rechairche', letter: 'Laitre', recap: 'Rékapitolatif',
@@ -480,6 +646,38 @@ const translations = {
     completionHigh: 'Profeel préske conplé', completionFull: 'Profeel conplé !',
     // Mark as sent
     markAsSent: 'Marké come candidatur envoyé',
+    // CV Tailor
+    cvTailor: 'Adapté CV', cvTailorTitle: 'Adapté mon CV', jobUrl: 'URL de l\'offre', jobTitleLabel: 'Titre du poste',
+    companyLabel: 'Entrepise', analyzeAdapt: 'Analisé et adapté', originalCV: 'CV Orijinal',
+    tailoredCV: 'CV Adapté', changesMade: 'Modificacion', keywordsMatched: 'Mots-clé trouvé',
+    keywordsMissing: 'Mots-clé mankan', copyTailoredCV: 'Copié le CV adapté', exportPdf: 'Exporté en PDF',
+    cvCopied: 'CV copié ✓', atsScore: 'Score ATS', atsScoreTitle: 'Score ATS',
+    checkAtsScore: 'Vérifié le score ATS', atsFormatTips: 'Consèys de forma', atsImprovements: 'Sugèstions',
+    interview: 'Entretein', interviewTitle: 'Préparacion d\'entretein', prepareMode: 'Préparé',
+    simulateMode: 'Simulé', generateQuestions: 'Généré les kestions', generatingQuestions: 'Généracion...',
+    suggestedAnswer: 'Réponse sugéré', companyTips: 'Consèys', salaryEstimate: 'Estimacion salaire',
+    startSimulation: 'Comencé', yourAnswer: 'Votre réponse...', submitAnswer: 'Envoyé',
+    nextQuestion: 'Kestion suivante', simulationComplete: 'Simulacion terminé', averageScore: 'Score moyen',
+    finalTips: 'Consèys finaux', questionOf: 'Kestion', of: 'sur',
+    emailPage: 'Émail', emailTitle: 'Émails', emailTo: 'Destinataire', emailSubject: 'Objé',
+    emailBody: 'Méssage', sendEmail: 'Envoyé', sendingEmail: 'Envoi...', scheduleFollowup: 'Programé relanse',
+    followupDays: 'Jours avan relanse', emailHistory: 'Historike dé émails', emailEmpty: 'Aucun émail.',
+    emailSent: 'Émail envoyé ✓', sendEmailBtn: 'Envoyé un émail', scheduleFollowupBtn: 'Programé relanse',
+    analytics: 'Analitiks', analyticsTitle: 'Tablo de bor', responseRate: 'Taux de réponse',
+    avgScore: 'Score moyen', totalApplications: 'Candidatur totales', totalAlerts: 'Alairtes totales',
+    applicationsPerWeek: 'Candidatur par semène', statusDistribution: 'Réparticion dé statu',
+    jobsPerPlatform: 'Offres par plateforme', topCompanies: 'Top entrepises',
+    aiInsights: 'Consèys IA', noDataYet: 'Pa encore de doné.',
+    generateMessage: 'Généré un méssage', messageContext: 'Contèxte (opcionel)',
+    messageContextPlaceholder: 'ex: même école', messageFormal: 'Formèl', messageCasual: 'Décontracté',
+    messageDirect: 'Dirèc', generatingMessages: 'Généracion...', copyMessage: 'Copié', messageCopied: 'Méssage copié ✓',
+    smtpConfig: 'Configuracion émail', smtpEmail: 'Émail SMTP', smtpPassword: 'Mot de pase SMTP',
+    smtpHost: 'Ôte SMTP', smtpPort: 'Por SMTP', shareProfile: 'Partagé mon profeel',
+    disableShare: 'Désactivé le partage', shareLink: 'Lien de partage', linkCopied: 'Lien copié ✓',
+    importLinkedin: 'Inporté depuis LinkédIn', linkedinUrl: 'URL du profeel LinkédIn',
+    importLinkedinBtn: 'Inporté', importing: 'Inportacion...', linkedinImported: 'Profeel LinkédIn inporté ✓',
+    darkMode: 'Mode sonbre', lightMode: 'Mode clair',
+    cvNotOptimized: 'CV non optimisé', prepareInterview: 'Préparé un entretein', exportLetterPdf: 'Exporté en PDF',
   },
 };
 
@@ -505,6 +703,14 @@ const Icon = {
   Download: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
   Bell: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>,
   Briefcase: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg>,
+  FileEdit: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M16 13l-4 4-2-2"/></svg>,
+  MessageCircle: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>,
+  Mail: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>,
+  BarChart: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>,
+  Moon: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>,
+  Sun: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>,
+  Share: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>,
+  Copy: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>,
 };
 
 function ToastContainer({ toasts }) {
@@ -592,11 +798,17 @@ function LoginPage({ onLogin }) {
   );
 }
 
+/* ---- DARK MODE HELPERS ---- */
+function getDarkMode() { return localStorage.getItem('jh_dark') === 'true'; }
+function applyTheme(dark) { document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light'); localStorage.setItem('jh_dark', dark); }
+applyTheme(getDarkMode());
+
 /* ---- APP ---- */
 function App() {
   const [user, setUser] = useState(getUser());
   const [page, setPage] = useState('dashboard');
   const [toasts, setToasts] = useState([]);
+  const [darkMode, setDarkMode] = useState(getDarkMode());
   const [chatOpen, setChatOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [profile, setProfile] = useState({ cv: '', cover_letter: '', goals: '', cvs: [], cover_letters: [], language: 'fr' });
@@ -630,6 +842,7 @@ function App() {
 
   const onLangChange = (newLang) => { setLang(newLang); setLangTick(n => n + 1); };
   const logout = () => { clearToken(); setUser(null); };
+  const toggleDarkMode = () => { const next = !darkMode; setDarkMode(next); applyTheme(next); };
 
   if (!isLoggedIn) return <><LoginPage onLogin={setUser} /><ToastContainer toasts={toasts} /></>;
 
@@ -638,10 +851,14 @@ function App() {
     { key: 'dashboard', icon: Icon.Dashboard },
     { key: 'profile', icon: Icon.Profile },
     { key: 'search', icon: Icon.Search },
+    { key: 'cv-tailor', icon: Icon.FileEdit, label: 'cvTailor' },
     { key: 'human', icon: Icon.People },
+    { key: 'interview', icon: Icon.MessageCircle },
     { key: 'alerts', icon: Icon.Bell },
     { key: 'tracker', icon: Icon.Briefcase },
     { key: 'letter', icon: Icon.Letter },
+    { key: 'email', icon: Icon.Mail, label: 'emailPage' },
+    { key: 'analytics', icon: Icon.BarChart },
     { key: 'recap', icon: Icon.Recap },
   ];
 
@@ -651,13 +868,17 @@ function App() {
       <div className={`sidebar ${menuOpen?'open':''}`}>
         <div className="sidebar-logo">JobHunter AI</div>
         <nav className="sidebar-nav">
-          {navItems.map(({ key, icon: Ic }) => (
+          {navItems.map(({ key, icon: Ic, label }) => (
             <div key={key} className={`nav-item ${page===key?'active':''}`} onClick={() => { setPage(key); setMenuOpen(false); if(key==='recap'||key==='dashboard'){loadStats();loadSaved();} }} style={{position:'relative'}}>
-              <Ic />{t(key)}
+              <Ic />{t(label || key)}
               {key === 'alerts' && (stats.unseen_alerts || 0) > 0 && <span className="alert-badge">{stats.unseen_alerts}</span>}
             </div>
           ))}
         </nav>
+        <div className="dark-toggle" onClick={toggleDarkMode}>
+          {darkMode ? <Icon.Sun /> : <Icon.Moon />}
+          <span>{darkMode ? t('lightMode') : t('darkMode')}</span>
+        </div>
         <div className="sidebar-version">{t('version')}</div>
         <div className="sidebar-user">
           <div className="sidebar-avatar" style={{background:'var(--accent)',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:14,fontWeight:600}}>{(user?.name||'U')[0]}</div>
@@ -671,12 +892,16 @@ function App() {
           <span style={{fontWeight:600,fontSize:16}}>JobHunter AI</span>
         </div>
         {page === 'dashboard' && <DashboardPage stats={stats} profile={profile} profileComplete={profileComplete} setPage={setPage} user={user} />}
-        {page === 'profile' && <ProfilePage profile={profile} setProfile={setProfile} loadProfile={loadProfile} loadStats={loadStats} toast={toast} onLangChange={onLangChange} />}
+        {page === 'profile' && <ProfilePage profile={profile} setProfile={setProfile} loadProfile={loadProfile} loadStats={loadStats} toast={toast} onLangChange={onLangChange} darkMode={darkMode} toggleDarkMode={toggleDarkMode} />}
         {page === 'search' && <SearchPage savedJobs={savedJobs} loadSaved={loadSaved} loadStats={loadStats} toast={toast} setPage={setPage} setStats={setStats} />}
+        {page === 'cv-tailor' && <CVTailorPage toast={toast} />}
         {page === 'human' && <HumanPage toast={toast} />}
+        {page === 'interview' && <InterviewPage toast={toast} />}
         {page === 'alerts' && <AlertsPage toast={toast} setPage={setPage} />}
-        {page === 'tracker' && <TrackerPage toast={toast} />}
+        {page === 'tracker' && <TrackerPage toast={toast} setPage={setPage} />}
         {page === 'letter' && <LetterPage savedJobs={savedJobs} loadStats={loadStats} toast={toast} />}
+        {page === 'email' && <EmailPage toast={toast} />}
+        {page === 'analytics' && <AnalyticsPage toast={toast} />}
         {page === 'recap' && <RecapPage stats={stats} savedJobs={savedJobs} />}
       </div>
       <button className="chat-fab" onClick={() => setChatOpen(!chatOpen)}><Icon.Chat /></button>
@@ -763,11 +988,26 @@ function DashboardPage({ stats, profile, profileComplete, setPage, user }) {
         </div>
       )}
 
+      {/* CV not optimized warning */}
+      <div className="banner banner-warning" style={{cursor:'pointer'}} onClick={() => setPage('cv-tailor')}>
+        {t('cvNotOptimized')}
+      </div>
+
+      {/* Analytics summary cards */}
+      {stats.applications_count > 0 && (
+        <div className="stats-row" style={{gridTemplateColumns:'repeat(2,1fr)'}}>
+          <div className="stat-card"><div className="stat-number">{stats.response_rate || 0}%</div><div className="stat-label">{t('responseRate')}</div></div>
+          <div className="stat-card"><div className="stat-number">{stats.avg_score || 0}</div><div className="stat-label">{t('avgScore')}</div></div>
+        </div>
+      )}
+
       <div className="card">
         <h3 className="card-title">{t('getStarted')}</h3>
         <div className="action-grid" style={{marginTop:16}}>
           <button className="btn btn-primary btn-lg" onClick={() => setPage('search')}>{t('launchSearch')}</button>
           <button className="btn btn-outline btn-lg" onClick={() => setPage('letter')}>{t('generateLetter')}</button>
+          <button className="btn btn-outline btn-lg" onClick={() => setPage('interview')}>{t('prepareInterview')}</button>
+          <button className="btn btn-outline btn-lg" onClick={() => setPage('cv-tailor')}>{t('cvTailor')}</button>
         </div>
       </div>
     </div>
@@ -813,12 +1053,21 @@ function PdfUploadZone({ onTextExtracted, toast, label }) {
 }
 
 /* ---- PROFILE ---- */
-function ProfilePage({ profile, setProfile, loadProfile, loadStats, toast, onLangChange }) {
+function ProfilePage({ profile, setProfile, loadProfile, loadStats, toast, onLangChange, darkMode, toggleDarkMode }) {
   const [cvs, setCvs] = useState(profile.cvs || []);
   const [coverLetters, setCoverLetters] = useState(profile.cover_letters || []);
   const [goals, setGoals] = useState(profile.goals || '');
   const [lang, setLangState] = useState(profile.language || getLang());
   const [saving, setSaving] = useState(false);
+  const [smtpExpanded, setSmtpExpanded] = useState(false);
+  const [smtpEmail, setSmtpEmail] = useState(profile.smtp_email || '');
+  const [smtpPassword, setSmtpPassword] = useState(profile.smtp_password || '');
+  const [smtpHost, setSmtpHost] = useState(profile.smtp_host || '');
+  const [smtpPort, setSmtpPort] = useState(profile.smtp_port || '587');
+  const [shareUrl, setShareUrl] = useState(profile.share_url || '');
+  const [sharing, setSharing] = useState(false);
+  const [linkedinUrl, setLinkedinUrl] = useState('');
+  const [linkedinLoading, setLinkedinLoading] = useState(false);
 
   useEffect(() => {
     setCvs(profile.cvs && profile.cvs.length > 0 ? profile.cvs : []);
@@ -835,7 +1084,8 @@ function ProfilePage({ profile, setProfile, loadProfile, loadStats, toast, onLan
     try {
       await api('/api/profile/save', { method: 'POST', body: JSON.stringify({
         cv: cvs[0]?.content || '', cover_letter: coverLetters[0]?.content || '', goals,
-        cvs, cover_letters: coverLetters, language: lang
+        cvs, cover_letters: coverLetters, language: lang, dark_mode: darkMode,
+        smtp_email: smtpEmail, smtp_password: smtpPassword, smtp_host: smtpHost, smtp_port: smtpPort
       })});
       toast(t('profileSaved'));
       setLang(lang);
@@ -938,6 +1188,93 @@ function ProfilePage({ profile, setProfile, loadProfile, loadStats, toast, onLan
         <h3 className="card-title">{t('myGoals')}</h3>
         <p className="card-subtitle">{t('goalsSubtitle')}</p>
         <textarea className="textarea" style={{minHeight:150}} value={goals} onChange={e => setGoals(e.target.value)} placeholder={t('goalsPlaceholder')} />
+      </div>
+
+      {/* Dark mode toggle */}
+      <div className="card">
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <div style={{display:'flex',alignItems:'center',gap:12}}>
+            {darkMode ? <Icon.Moon /> : <Icon.Sun />}
+            <h3 className="card-title" style={{marginBottom:0}}>{darkMode ? t('darkMode') : t('lightMode')}</h3>
+          </div>
+          <button className={`btn ${darkMode ? 'btn-primary' : 'btn-outline'}`} onClick={toggleDarkMode}>
+            {darkMode ? t('lightMode') : t('darkMode')}
+          </button>
+        </div>
+      </div>
+
+      {/* SMTP Configuration */}
+      <div className="card">
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',cursor:'pointer'}} onClick={() => setSmtpExpanded(!smtpExpanded)}>
+          <h3 className="card-title" style={{marginBottom:0}}>{t('smtpConfig')}</h3>
+          <span style={{fontSize:18,color:'var(--text-secondary)'}}>{smtpExpanded ? '▲' : '▼'}</span>
+        </div>
+        {smtpExpanded && (
+          <div style={{marginTop:16,display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+            <div>
+              <label className="input-label">{t('smtpEmail')}</label>
+              <input className="input" value={smtpEmail} onChange={e => setSmtpEmail(e.target.value)} placeholder="you@example.com" />
+            </div>
+            <div>
+              <label className="input-label">{t('smtpPassword')}</label>
+              <input className="input" type="password" value={smtpPassword} onChange={e => setSmtpPassword(e.target.value)} placeholder="••••••" />
+            </div>
+            <div>
+              <label className="input-label">{t('smtpHost')}</label>
+              <input className="input" value={smtpHost} onChange={e => setSmtpHost(e.target.value)} placeholder="smtp.gmail.com" />
+            </div>
+            <div>
+              <label className="input-label">{t('smtpPort')}</label>
+              <input className="input" value={smtpPort} onChange={e => setSmtpPort(e.target.value)} placeholder="587" />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Share Profile */}
+      <div className="card">
+        <h3 className="card-title">{t('shareProfile')}</h3>
+        {shareUrl ? (
+          <div>
+            <div className="share-link">
+              <input className="input" readOnly value={shareUrl} />
+              <button className="btn btn-outline" onClick={() => { navigator.clipboard.writeText(shareUrl); toast(t('linkCopied')); }}><Icon.Copy /> {t('copyMessage')}</button>
+            </div>
+            <button className="btn btn-outline" style={{marginTop:12,color:'var(--danger)',borderColor:'var(--danger)'}} onClick={async () => {
+              try { await api('/api/profile/share', { method: 'DELETE' }); setShareUrl(''); } catch(e) { toast(e.message, 'error'); }
+            }}>{t('disableShare')}</button>
+          </div>
+        ) : (
+          <button className="btn btn-primary" disabled={sharing} onClick={async () => {
+            setSharing(true);
+            try { const data = await api('/api/profile/share', { method: 'POST' }); setShareUrl(data.url || data.share_url || ''); } catch(e) { toast(e.message, 'error'); }
+            setSharing(false);
+          }}><Icon.Share /> {t('shareProfile')}</button>
+        )}
+      </div>
+
+      {/* LinkedIn Import */}
+      <div className="card">
+        <h3 className="card-title">{t('importLinkedin')}</h3>
+        <div style={{display:'flex',gap:12,alignItems:'flex-end',marginTop:8}}>
+          <div style={{flex:1}}>
+            <label className="input-label">{t('linkedinUrl')}</label>
+            <input className="input" value={linkedinUrl} onChange={e => setLinkedinUrl(e.target.value)} placeholder="https://www.linkedin.com/in/..." />
+          </div>
+          <button className="btn btn-primary" disabled={linkedinLoading || !linkedinUrl.trim()} onClick={async () => {
+            setLinkedinLoading(true);
+            try {
+              const data = await api('/api/profile/import-linkedin', { method: 'POST', body: JSON.stringify({ linkedin_url: linkedinUrl }) });
+              toast(t('linkedinImported'));
+              if (data.text && cvs.length > 0) { setCvs(cvs.map((c,i) => i === 0 ? {...c, content: c.content + '\n\n' + data.text} : c)); }
+              else if (data.text) { setCvs([{ name: 'LinkedIn Import', content: data.text }]); }
+              await loadProfile();
+            } catch(e) { toast(e.message, 'error'); }
+            setLinkedinLoading(false);
+          }}>
+            {linkedinLoading ? <><div className="spinner" style={{width:16,height:16,margin:0,borderWidth:2}}/> {t('importing')}</> : t('importLinkedinBtn')}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -1151,6 +1488,7 @@ function LetterPage({ savedJobs, loadStats, toast }) {
             {!markedSent && <button className="btn btn-outline" style={{borderColor:'var(--success)',color:'var(--success)'}} onClick={markAsSent}>{t('markAsSent')}</button>}
             {markedSent && <span style={{display:'flex',alignItems:'center',color:'var(--success)',fontSize:13,fontWeight:500}}>&#10003; {t('applicationSaved')}</span>}
             <button className="btn btn-outline" onClick={copyLetter}>{t('copyLetter')}</button>
+            <button className="btn btn-outline" onClick={() => window.open('/api/export/letter/latest', '_blank')}>{t('exportLetterPdf')}</button>
             <button className="btn btn-primary" onClick={generate}>{t('regenerate')}</button>
           </div>
         </div>
@@ -1190,7 +1528,10 @@ function RecapPage({ stats, savedJobs }) {
         {letters.slice(0,5).map(l => (
           <div className="recap-item" key={l.id}>
             <div><div className="recap-title">{l.job_title}{l.company && ` — ${l.company}`}</div><div className="recap-date">{l.created_at ? new Date(l.created_at).toLocaleDateString('fr-FR') : ''}</div></div>
-            <button className="btn btn-outline" style={{fontSize:12,padding:'6px 14px'}} onClick={() => setViewLetter(l)}>{t('review')}</button>
+            <div style={{display:'flex',gap:8}}>
+              <button className="btn btn-outline" style={{fontSize:12,padding:'6px 14px'}} onClick={() => window.open(`/api/export/letter/${l.id}`, '_blank')}>{t('exportLetterPdf')}</button>
+              <button className="btn btn-outline" style={{fontSize:12,padding:'6px 14px'}} onClick={() => setViewLetter(l)}>{t('review')}</button>
+            </div>
           </div>
         ))}
       </div>
@@ -1222,6 +1563,10 @@ function HumanPage({ toast }) {
   const [searched, setSearched] = useState(false);
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(true);
+  const [msgPerson, setMsgPerson] = useState(null);
+  const [msgContext, setMsgContext] = useState('');
+  const [msgLoading, setMsgLoading] = useState(false);
+  const [messages, setMessages] = useState(null);
 
   const loadHistory = async () => {
     try {
@@ -1361,17 +1706,52 @@ function HumanPage({ toast }) {
                   <th>{t('humanCompany')}</th>
                   <th>{t('humanLocationCol')}</th>
                   <th>{t('humanLinkedin')}</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
                 {people.map((p, i) => (
-                  <tr key={i}>
-                    <td><span className="people-name">{p.name}</span></td>
-                    <td><span className="people-title">{p.title}</span></td>
-                    <td>{p.company}</td>
-                    <td>{p.location}</td>
-                    <td><a href={p.linkedin_url} target="_blank" rel="noopener noreferrer">{t('humanView')}</a></td>
-                  </tr>
+                  <React.Fragment key={i}>
+                    <tr>
+                      <td><span className="people-name">{p.name}</span></td>
+                      <td><span className="people-title">{p.title}</span></td>
+                      <td>{p.company}</td>
+                      <td>{p.location}</td>
+                      <td><a href={p.linkedin_url} target="_blank" rel="noopener noreferrer">{t('humanView')}</a></td>
+                      <td>
+                        <button className="btn btn-outline" style={{fontSize:11,padding:'4px 10px'}} onClick={() => { setMsgPerson(msgPerson === i ? null : i); setMessages(null); }}>
+                          {t('generateMessage')}
+                        </button>
+                      </td>
+                    </tr>
+                    {msgPerson === i && (
+                      <tr><td colSpan="6" style={{padding:'12px 16px',background:'var(--main-bg)'}}>
+                        <div style={{marginBottom:12}}>
+                          <label className="input-label">{t('messageContext')}</label>
+                          <input className="input" value={msgContext} onChange={e => setMsgContext(e.target.value)} placeholder={t('messageContextPlaceholder')} style={{maxWidth:400}} />
+                        </div>
+                        <button className="btn btn-primary" style={{fontSize:12,marginBottom:12}} disabled={msgLoading} onClick={async () => {
+                          setMsgLoading(true);
+                          try {
+                            const data = await api('/api/networking/messages', { method: 'POST', body: JSON.stringify({ person: p, context: msgContext }) });
+                            setMessages(data.messages || { formal: data.formal || '', casual: data.casual || '', direct: data.direct || '' });
+                          } catch(e) { toast(e.message, 'error'); }
+                          setMsgLoading(false);
+                        }}>{msgLoading ? t('generatingMessages') : t('generateMessage')}</button>
+                        {messages && (
+                          <div className="msg-options">
+                            {[['formal', t('messageFormal')], ['casual', t('messageCasual')], ['direct', t('messageDirect')]].map(([key, label]) => (
+                              <div key={key} className="msg-option">
+                                <div className="msg-option-label">{label}</div>
+                                <div className="msg-option-text">{messages[key]}</div>
+                                <button className="btn btn-outline copy-btn" style={{fontSize:11,padding:'3px 8px'}} onClick={() => { navigator.clipboard.writeText(messages[key]); toast(t('messageCopied')); }}>{t('copyMessage')}</button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </td></tr>
+                    )}
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>
@@ -1439,7 +1819,7 @@ function AlertsPage({ toast, setPage }) {
 }
 
 /* ---- TRACKER PAGE ---- */
-function TrackerPage({ toast }) {
+function TrackerPage({ toast, setPage }) {
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -1542,8 +1922,10 @@ function TrackerPage({ toast }) {
                     </select>
                     <textarea className="textarea" style={{fontSize:12,minHeight:50,marginBottom:8}} placeholder={t('applicationNotes')}
                       defaultValue={app.notes || ''} onBlur={e => { if (e.target.value !== (app.notes || '')) updateApp(app.id, { notes: e.target.value }); }} />
-                    <div style={{display:'flex',gap:8}}>
+                    <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
                       {app.url && <a href={app.url} target="_blank" rel="noopener noreferrer" className="btn btn-outline" style={{fontSize:11,padding:'3px 8px'}}>{t('viewOffer')}</a>}
+                      <button className="btn btn-outline" style={{fontSize:11,padding:'3px 8px'}} onClick={() => setPage('email')}>{t('sendEmailBtn')}</button>
+                      <button className="btn btn-outline" style={{fontSize:11,padding:'3px 8px'}} onClick={() => setPage('email')}>{t('scheduleFollowupBtn')}</button>
                       <button className="btn btn-outline" style={{fontSize:11,padding:'3px 8px',color:'var(--danger)',borderColor:'var(--danger)'}} onClick={() => deleteApp(app.id)}>{t('applicationDelete')}</button>
                     </div>
                   </div>
@@ -1553,6 +1935,541 @@ function TrackerPage({ toast }) {
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ---- CV TAILOR PAGE ---- */
+function CVTailorPage({ toast }) {
+  const [jobUrl, setJobUrl] = useState('');
+  const [jobDesc, setJobDesc] = useState('');
+  const [jobTitle, setJobTitle] = useState('');
+  const [company, setCompany] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [atsLoading, setAtsLoading] = useState(false);
+  const [atsResult, setAtsResult] = useState(null);
+
+  const tailor = async () => {
+    if (!jobDesc.trim() && !jobUrl.trim()) { toast(t('pasteDesc'), 'error'); return; }
+    setLoading(true);
+    try {
+      const data = await api('/api/cv/tailor', { method: 'POST', body: JSON.stringify({ job_url: jobUrl, job_description: jobDesc, job_title: jobTitle, company }) });
+      setResult(data);
+    } catch(e) { toast(e.message, 'error'); }
+    setLoading(false);
+  };
+
+  const checkAts = async () => {
+    setAtsLoading(true);
+    try {
+      const data = await api('/api/cv/ats-score', { method: 'POST', body: JSON.stringify({ job_description: jobDesc, job_title: jobTitle }) });
+      setAtsResult(data);
+    } catch(e) { toast(e.message, 'error'); }
+    setAtsLoading(false);
+  };
+
+  const atsColorClass = (score) => score < 40 ? 'ats-red' : score < 70 ? 'ats-orange' : 'ats-green';
+
+  return (
+    <div>
+      <h1 className="page-title">{t('cvTailorTitle')}</h1>
+      <div className="card">
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
+          <div>
+            <label className="input-label">{t('jobUrl')}</label>
+            <input className="input" value={jobUrl} onChange={e => setJobUrl(e.target.value)} placeholder="https://..." />
+          </div>
+          <div>
+            <label className="input-label">{t('jobTitleLabel')}</label>
+            <input className="input" value={jobTitle} onChange={e => setJobTitle(e.target.value)} placeholder={t('jobTitleLabel')} />
+          </div>
+        </div>
+        <div style={{marginBottom:12}}>
+          <label className="input-label">{t('companyLabel')}</label>
+          <input className="input" value={company} onChange={e => setCompany(e.target.value)} placeholder={t('companyLabel')} style={{maxWidth:400}} />
+        </div>
+        <div style={{marginBottom:16}}>
+          <label className="input-label">{t('jobDescription')}</label>
+          <textarea className="textarea" style={{minHeight:150}} value={jobDesc} onChange={e => setJobDesc(e.target.value)} placeholder={t('pasteDescription')} />
+        </div>
+        <div style={{display:'flex',gap:12}}>
+          <button className="btn btn-primary" onClick={tailor} disabled={loading}>{loading ? t('analyzing') : t('analyzeAdapt')}</button>
+          <button className="btn btn-outline" onClick={checkAts} disabled={atsLoading}>{atsLoading ? t('analyzing') : t('checkAtsScore')}</button>
+        </div>
+      </div>
+
+      {loading && <div><div className="spinner"/><div className="loading-text">{t('analyzing')}</div></div>}
+
+      {/* ATS Score Result */}
+      {atsResult && (
+        <div className="card" style={{textAlign:'center'}}>
+          <h3 className="card-title" style={{marginBottom:16}}>{t('atsScoreTitle')}</h3>
+          <div className={`ats-circle ${atsColorClass(atsResult.score || 0)}`}>
+            {atsResult.score || 0}
+          </div>
+          <div style={{display:'flex',flexWrap:'wrap',gap:6,justifyContent:'center',marginBottom:16}}>
+            {(atsResult.keywords_found || []).map((k,i) => <span key={i} className="badge-green">{k}</span>)}
+            {(atsResult.keywords_missing || []).map((k,i) => <span key={i} className="badge-red">{k}</span>)}
+          </div>
+          {atsResult.format_tips && atsResult.format_tips.length > 0 && (
+            <div style={{textAlign:'left',marginBottom:12}}>
+              <h4 style={{fontSize:14,marginBottom:8}}>{t('atsFormatTips')}</h4>
+              <ul style={{paddingLeft:20,fontSize:13,color:'var(--text-secondary)'}}>
+                {atsResult.format_tips.map((tip,i) => <li key={i} style={{marginBottom:4}}>{tip}</li>)}
+              </ul>
+            </div>
+          )}
+          {atsResult.improvements && atsResult.improvements.length > 0 && (
+            <div style={{textAlign:'left'}}>
+              <h4 style={{fontSize:14,marginBottom:8}}>{t('atsImprovements')}</h4>
+              <ul style={{paddingLeft:20,fontSize:13,color:'var(--text-secondary)'}}>
+                {atsResult.improvements.map((s,i) => <li key={i} style={{marginBottom:4}}>{s}</li>)}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tailor Result */}
+      {result && !loading && (
+        <div>
+          <div className="card">
+            <h3 className="card-title" style={{marginBottom:16}}>{t('tailoredCV')}</h3>
+            <div className="diff-view">
+              <div>
+                <h4 style={{fontSize:13,color:'var(--text-secondary)',marginBottom:8}}>{t('originalCV')}</h4>
+                <div className="diff-panel">{result.original_cv || ''}</div>
+              </div>
+              <div>
+                <h4 style={{fontSize:13,color:'var(--text-secondary)',marginBottom:8}}>{t('tailoredCV')}</h4>
+                <div className="diff-panel">{result.tailored_cv || ''}</div>
+              </div>
+            </div>
+          </div>
+          {result.changes && result.changes.length > 0 && (
+            <div className="card">
+              <h3 className="card-title" style={{marginBottom:12}}>{t('changesMade')}</h3>
+              <ul style={{paddingLeft:20,fontSize:13,lineHeight:2}}>
+                {result.changes.map((c,i) => <li key={i}>{c}</li>)}
+              </ul>
+            </div>
+          )}
+          <div className="card">
+            <h3 className="card-title" style={{marginBottom:12}}>{t('keywordsMatched')}</h3>
+            <div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:12}}>
+              {(result.keywords_matched || []).map((k,i) => <span key={i} className="badge-green">{k}</span>)}
+            </div>
+            <h3 className="card-title" style={{marginBottom:12}}>{t('keywordsMissing')}</h3>
+            <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+              {(result.keywords_missing || []).map((k,i) => <span key={i} className="badge-red">{k}</span>)}
+            </div>
+          </div>
+          <div style={{display:'flex',gap:12,marginTop:8}}>
+            <button className="btn btn-primary" onClick={() => { navigator.clipboard.writeText(result.tailored_cv || ''); toast(t('cvCopied')); }}>{t('copyTailoredCV')}</button>
+            <button className="btn btn-outline" onClick={() => window.open('/api/export/cv?tailored=true', '_blank')}>{t('exportPdf')}</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---- INTERVIEW PAGE ---- */
+function InterviewPage({ toast }) {
+  const [mode, setMode] = useState('prepare');
+  const [jobTitle, setJobTitle] = useState('');
+  const [company, setCompany] = useState('');
+  const [jobDesc, setJobDesc] = useState('');
+  const [loading, setLoading] = useState(false);
+  // Prepare mode
+  const [questions, setQuestions] = useState([]);
+  const [expandedQ, setExpandedQ] = useState(null);
+  const [tips, setTips] = useState([]);
+  const [salaryRange, setSalaryRange] = useState('');
+  // Simulate mode
+  const [simMessages, setSimMessages] = useState([]);
+  const [simInput, setSimInput] = useState('');
+  const [simLoading, setSimLoading] = useState(false);
+  const [simQuestion, setSimQuestion] = useState(0);
+  const [simTotal, setSimTotal] = useState(10);
+  const [simDone, setSimDone] = useState(false);
+  const [simSummary, setSimSummary] = useState(null);
+  const bottomRef = useRef();
+
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [simMessages]);
+
+  const generateQuestions = async () => {
+    if (!jobTitle.trim()) return;
+    setLoading(true);
+    try {
+      const data = await api('/api/interview/prepare', { method: 'POST', body: JSON.stringify({ job_title: jobTitle, company, job_description: jobDesc }) });
+      setQuestions(data.questions || []);
+      setTips(data.company_tips || []);
+      setSalaryRange(data.salary_range || '');
+    } catch(e) { toast(e.message, 'error'); }
+    setLoading(false);
+  };
+
+  const startSimulation = async () => {
+    if (!jobTitle.trim()) return;
+    setSimMessages([]);
+    setSimQuestion(0);
+    setSimDone(false);
+    setSimSummary(null);
+    setSimLoading(true);
+    try {
+      const data = await api('/api/interview/simulate', { method: 'POST', body: JSON.stringify({ job_title: jobTitle, company, job_description: jobDesc, action: 'start' }) });
+      setSimMessages([{ role: 'ai', text: data.question || data.message }]);
+      setSimQuestion(1);
+      setSimTotal(data.total_questions || 10);
+    } catch(e) { toast(e.message, 'error'); }
+    setSimLoading(false);
+  };
+
+  const submitAnswer = async () => {
+    if (!simInput.trim() || simLoading) return;
+    const answer = simInput.trim();
+    setSimInput('');
+    setSimMessages(m => [...m, { role: 'user', text: answer }]);
+    setSimLoading(true);
+    try {
+      const data = await api('/api/interview/simulate', { method: 'POST', body: JSON.stringify({ job_title: jobTitle, company, action: 'answer', answer, question_number: simQuestion }) });
+      if (data.feedback) setSimMessages(m => [...m, { role: 'ai', text: `${data.feedback}${data.score ? ` (${data.score}/10)` : ''}` }]);
+      if (data.done) {
+        setSimDone(true);
+        setSimSummary(data.summary || { average_score: data.average_score, tips: data.tips || [] });
+      } else if (data.next_question) {
+        setSimMessages(m => [...m, { role: 'ai', text: data.next_question }]);
+        setSimQuestion(q => q + 1);
+      }
+    } catch(e) { toast(e.message, 'error'); }
+    setSimLoading(false);
+  };
+
+  return (
+    <div>
+      <h1 className="page-title">{t('interviewTitle')}</h1>
+      <div className="card">
+        <div className="toggle-row">
+          <button className={`toggle-btn ${mode==='prepare'?'active':''}`} onClick={() => setMode('prepare')}>{t('prepareMode')}</button>
+          <button className={`toggle-btn ${mode==='simulate'?'active':''}`} onClick={() => setMode('simulate')}>{t('simulateMode')}</button>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
+          <div>
+            <label className="input-label">{t('jobTitleLabel')}</label>
+            <input className="input" value={jobTitle} onChange={e => setJobTitle(e.target.value)} placeholder={t('jobTitleLabel')} />
+          </div>
+          <div>
+            <label className="input-label">{t('companyLabel')}</label>
+            <input className="input" value={company} onChange={e => setCompany(e.target.value)} placeholder={t('companyLabel')} />
+          </div>
+        </div>
+        <div style={{marginBottom:16}}>
+          <label className="input-label">{t('jobDescription')}</label>
+          <textarea className="textarea" style={{minHeight:100}} value={jobDesc} onChange={e => setJobDesc(e.target.value)} placeholder={t('pasteDescription')} />
+        </div>
+        {mode === 'prepare' && (
+          <button className="btn btn-primary" onClick={generateQuestions} disabled={loading}>{loading ? t('generatingQuestions') : t('generateQuestions')}</button>
+        )}
+        {mode === 'simulate' && !simMessages.length && (
+          <button className="btn btn-primary" onClick={startSimulation} disabled={simLoading}>{t('startSimulation')}</button>
+        )}
+      </div>
+
+      {loading && <div><div className="spinner"/><div className="loading-text">{t('generatingQuestions')}</div></div>}
+
+      {/* Prepare mode results */}
+      {mode === 'prepare' && questions.length > 0 && !loading && (
+        <div>
+          {questions.map((q, i) => (
+            <div key={i} className="card" style={{cursor:'pointer'}} onClick={() => setExpandedQ(expandedQ === i ? null : i)}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                <span style={{fontWeight:600,fontSize:14}}>{i+1}. {q.question || q}</span>
+                <span style={{color:'var(--text-secondary)',fontSize:16}}>{expandedQ === i ? '▲' : '▼'}</span>
+              </div>
+              {expandedQ === i && q.answer && (
+                <div style={{marginTop:12,padding:12,background:'var(--main-bg)',borderRadius:8,fontSize:13,lineHeight:1.7,color:'var(--text-secondary)'}}>
+                  <strong>{t('suggestedAnswer')}:</strong><br/>{q.answer}
+                </div>
+              )}
+            </div>
+          ))}
+          {tips.length > 0 && (
+            <div className="card">
+              <h3 className="card-title" style={{marginBottom:8}}>{t('companyTips')}</h3>
+              <ul style={{paddingLeft:20,fontSize:13,color:'var(--text-secondary)'}}>
+                {tips.map((tip,i) => <li key={i} style={{marginBottom:4}}>{tip}</li>)}
+              </ul>
+            </div>
+          )}
+          {salaryRange && (
+            <div className="card">
+              <h3 className="card-title" style={{marginBottom:4}}>{t('salaryEstimate')}</h3>
+              <p style={{fontSize:18,fontWeight:700,color:'var(--accent)'}}>{salaryRange}</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Simulate mode */}
+      {mode === 'simulate' && simMessages.length > 0 && (
+        <div className="card">
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+            <span style={{fontSize:13,color:'var(--text-secondary)'}}>{t('questionOf')} {simQuestion} {t('of')} {simTotal}</span>
+          </div>
+          <div className="progress-bar" style={{marginBottom:16}}><div className="progress-fill" style={{width:`${(simQuestion/simTotal)*100}%`}}/></div>
+          <div className="interview-chat">
+            {simMessages.map((m,i) => <div key={i} className={`interview-msg ${m.role}`}>{m.text}</div>)}
+            {simLoading && <div className="interview-msg ai">...</div>}
+            <div ref={bottomRef}/>
+          </div>
+          {!simDone && (
+            <div style={{display:'flex',gap:8}}>
+              <textarea className="textarea" style={{minHeight:60}} value={simInput} onChange={e => setSimInput(e.target.value)} placeholder={t('yourAnswer')} onKeyDown={e => { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); submitAnswer(); }}} />
+              <button className="btn btn-primary" style={{alignSelf:'flex-end'}} onClick={submitAnswer} disabled={simLoading}>{t('submitAnswer')}</button>
+            </div>
+          )}
+          {simDone && simSummary && (
+            <div style={{textAlign:'center',padding:20,borderTop:'1px solid var(--border)',marginTop:16}}>
+              <h3 style={{marginBottom:8}}>{t('simulationComplete')}</h3>
+              <div style={{fontSize:36,fontWeight:700,color:'var(--accent)',marginBottom:8}}>{simSummary.average_score || 0}/10</div>
+              <p style={{color:'var(--text-secondary)',fontSize:13,marginBottom:12}}>{t('averageScore')}</p>
+              {simSummary.tips && simSummary.tips.length > 0 && (
+                <div style={{textAlign:'left'}}>
+                  <h4 style={{fontSize:14,marginBottom:8}}>{t('finalTips')}</h4>
+                  <ul style={{paddingLeft:20,fontSize:13,color:'var(--text-secondary)'}}>
+                    {simSummary.tips.map((tip,i) => <li key={i} style={{marginBottom:4}}>{tip}</li>)}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---- EMAIL PAGE ---- */
+function EmailPage({ toast }) {
+  const [to, setTo] = useState('');
+  const [subject, setSubject] = useState('');
+  const [body, setBody] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [scheduleFollowup, setScheduleFollowup] = useState(false);
+  const [followupDays, setFollowupDays] = useState(7);
+  const [emails, setEmails] = useState([]);
+  const [emailsLoading, setEmailsLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try { const data = await api('/api/emails'); setEmails(data.emails || data || []); } catch(e) {}
+      setEmailsLoading(false);
+    })();
+  }, []);
+
+  const sendEmail = async () => {
+    if (!to.trim() || !subject.trim()) return;
+    setLoading(true);
+    try {
+      await api('/api/email/send', { method: 'POST', body: JSON.stringify({ to, subject, body, schedule_followup: scheduleFollowup, delay_days: followupDays }) });
+      toast(t('emailSent'));
+      setTo(''); setSubject(''); setBody('');
+      setEmails(prev => [{ to, subject, body, sent_at: new Date().toISOString() }, ...prev]);
+    } catch(e) { toast(e.message, 'error'); }
+    setLoading(false);
+  };
+
+  return (
+    <div>
+      <h1 className="page-title">{t('emailTitle')}</h1>
+      <div className="card">
+        <div style={{marginBottom:12}}>
+          <label className="input-label">{t('emailTo')}</label>
+          <input className="input" value={to} onChange={e => setTo(e.target.value)} placeholder="email@example.com" />
+        </div>
+        <div style={{marginBottom:12}}>
+          <label className="input-label">{t('emailSubject')}</label>
+          <input className="input" value={subject} onChange={e => setSubject(e.target.value)} placeholder={t('emailSubject')} />
+        </div>
+        <div style={{marginBottom:12}}>
+          <label className="input-label">{t('emailBody')}</label>
+          <textarea className="textarea" style={{minHeight:200}} value={body} onChange={e => setBody(e.target.value)} placeholder={t('emailBody')} />
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:16,marginBottom:16}}>
+          <label className="checkbox-label">
+            <input type="checkbox" checked={scheduleFollowup} onChange={e => setScheduleFollowup(e.target.checked)} />
+            {t('scheduleFollowup')}
+          </label>
+          {scheduleFollowup && (
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <label className="input-label" style={{marginBottom:0}}>{t('followupDays')}</label>
+              <input className="input" type="number" value={followupDays} onChange={e => setFollowupDays(parseInt(e.target.value) || 7)} style={{width:80}} min="1" />
+            </div>
+          )}
+        </div>
+        <button className="btn btn-primary" onClick={sendEmail} disabled={loading}>{loading ? t('sendingEmail') : t('sendEmail')}</button>
+      </div>
+
+      {/* Email History */}
+      <div className="card">
+        <h3 className="card-title" style={{marginBottom:16}}>{t('emailHistory')}</h3>
+        {emailsLoading && <div className="spinner"/>}
+        {!emailsLoading && emails.length === 0 && <p style={{color:'var(--text-secondary)',fontSize:14}}>{t('emailEmpty')}</p>}
+        {emails.map((em, i) => (
+          <div key={i} className="email-item">
+            <div>
+              <div style={{fontWeight:600,fontSize:14}}>{em.subject}</div>
+              <div style={{fontSize:12,color:'var(--text-secondary)'}}>{em.to} · {em.sent_at ? new Date(em.sent_at).toLocaleDateString('fr-FR') : ''}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ---- ANALYTICS PAGE ---- */
+function AnalyticsPage({ toast }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const lineChartRef = useRef(null);
+  const pieChartRef = useRef(null);
+  const barChartRef = useRef(null);
+  const lineChartInstance = useRef(null);
+  const pieChartInstance = useRef(null);
+  const barChartInstance = useRef(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [statsData, appsData] = await Promise.all([
+          api('/api/stats'),
+          api('/api/applications')
+        ]);
+        setData({ stats: statsData, applications: appsData || [] });
+      } catch(e) { toast(e.message, 'error'); }
+      setLoading(false);
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!data || typeof Chart === 'undefined') return;
+    const apps = data.applications || [];
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const textColor = isDark ? '#a0a0a0' : '#64748b';
+    const gridColor = isDark ? '#2a2a4a' : '#e2e8f0';
+
+    // Line chart - applications per week
+    if (lineChartRef.current) {
+      if (lineChartInstance.current) lineChartInstance.current.destroy();
+      const weekCounts = {};
+      apps.forEach(a => {
+        const d = new Date(a.applied_at || a.created_at);
+        const weekStart = new Date(d); weekStart.setDate(d.getDate() - d.getDay());
+        const key = weekStart.toISOString().slice(0, 10);
+        weekCounts[key] = (weekCounts[key] || 0) + 1;
+      });
+      const sortedWeeks = Object.keys(weekCounts).sort().slice(-8);
+      lineChartInstance.current = new Chart(lineChartRef.current, {
+        type: 'line',
+        data: { labels: sortedWeeks.map(w => w.slice(5)), datasets: [{ label: t('applicationsPerWeek'), data: sortedWeeks.map(w => weekCounts[w]), borderColor: '#7c5cfc', backgroundColor: 'rgba(124,92,252,0.1)', fill: true, tension: 0.3 }] },
+        options: { responsive: true, maintainAspectRatio: false, scales: { x: { ticks: { color: textColor }, grid: { color: gridColor } }, y: { ticks: { color: textColor }, grid: { color: gridColor } } }, plugins: { legend: { labels: { color: textColor } } } }
+      });
+    }
+
+    // Pie chart - status distribution
+    if (pieChartRef.current) {
+      if (pieChartInstance.current) pieChartInstance.current.destroy();
+      const statusCounts = {};
+      apps.forEach(a => { statusCounts[a.status] = (statusCounts[a.status] || 0) + 1; });
+      const labels = Object.keys(statusCounts);
+      const colors = ['#6c63ff', '#22c55e', '#f59e0b', '#ef4444', '#94a3b8'];
+      pieChartInstance.current = new Chart(pieChartRef.current, {
+        type: 'doughnut',
+        data: { labels, datasets: [{ data: labels.map(l => statusCounts[l]), backgroundColor: colors.slice(0, labels.length) }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: textColor } } } }
+      });
+    }
+
+    // Bar chart - jobs per platform
+    if (barChartRef.current) {
+      if (barChartInstance.current) barChartInstance.current.destroy();
+      const platCounts = data.stats?.jobs_per_platform || {};
+      const platLabels = Object.keys(platCounts);
+      barChartInstance.current = new Chart(barChartRef.current, {
+        type: 'bar',
+        data: { labels: platLabels, datasets: [{ label: t('jobsPerPlatform'), data: platLabels.map(p => platCounts[p]), backgroundColor: ['#0a66c2', '#ffcd00', '#2557a7', '#1e3a5f', '#94a3b8'] }] },
+        options: { responsive: true, maintainAspectRatio: false, scales: { x: { ticks: { color: textColor }, grid: { color: gridColor } }, y: { ticks: { color: textColor }, grid: { color: gridColor } } }, plugins: { legend: { display: false } } }
+      });
+    }
+
+    return () => {
+      if (lineChartInstance.current) lineChartInstance.current.destroy();
+      if (pieChartInstance.current) pieChartInstance.current.destroy();
+      if (barChartInstance.current) barChartInstance.current.destroy();
+    };
+  }, [data]);
+
+  if (loading) return <div><h1 className="page-title">{t('analyticsTitle')}</h1><div className="spinner"/></div>;
+  if (!data) return <div><h1 className="page-title">{t('analyticsTitle')}</h1><p>{t('noDataYet')}</p></div>;
+
+  const stats = data.stats || {};
+  const apps = data.applications || [];
+  const interviewCount = apps.filter(a => a.status === 'interview').length;
+  const responseRate = apps.length > 0 ? Math.round((interviewCount / apps.length) * 100) : 0;
+
+  return (
+    <div>
+      <h1 className="page-title">{t('analyticsTitle')}</h1>
+      <div className="stats-row" style={{gridTemplateColumns:'repeat(4,1fr)'}}>
+        <div className="stat-card"><div className="stat-number">{responseRate}%</div><div className="stat-label">{t('responseRate')}</div></div>
+        <div className="stat-card"><div className="stat-number">{stats.avg_score || 0}</div><div className="stat-label">{t('avgScore')}</div></div>
+        <div className="stat-card"><div className="stat-number">{apps.length}</div><div className="stat-label">{t('totalApplications')}</div></div>
+        <div className="stat-card"><div className="stat-number">{stats.unseen_alerts || 0}</div><div className="stat-label">{t('totalAlerts')}</div></div>
+      </div>
+
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
+        <div className="card">
+          <h3 className="card-title" style={{marginBottom:12}}>{t('applicationsPerWeek')}</h3>
+          <div className="chart-container"><canvas ref={lineChartRef}/></div>
+        </div>
+        <div className="card">
+          <h3 className="card-title" style={{marginBottom:12}}>{t('statusDistribution')}</h3>
+          <div className="chart-container"><canvas ref={pieChartRef}/></div>
+        </div>
+      </div>
+
+      <div className="card">
+        <h3 className="card-title" style={{marginBottom:12}}>{t('jobsPerPlatform')}</h3>
+        <div className="chart-container"><canvas ref={barChartRef}/></div>
+      </div>
+
+      {/* Top companies */}
+      {stats.top_companies && stats.top_companies.length > 0 && (
+        <div className="card">
+          <h3 className="card-title" style={{marginBottom:12}}>{t('topCompanies')}</h3>
+          <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
+            {stats.top_companies.map((c,i) => (
+              <span key={i} style={{background:'var(--main-bg)',padding:'6px 14px',borderRadius:20,fontSize:13,fontWeight:500}}>{c.name || c} ({c.count || ''})</span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* AI Insights */}
+      <div className="card">
+        <h3 className="card-title" style={{marginBottom:12}}>{t('aiInsights')}</h3>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(250px,1fr))',gap:12}}>
+          <div style={{padding:16,background:'var(--main-bg)',borderRadius:8,fontSize:13,lineHeight:1.6}}>
+            {apps.length < 5 ? t('noDataYet') : `${t('responseRate')}: ${responseRate}% - ${responseRate < 20 ? 'Consider tailoring your CV more' : 'Good response rate!'}`}
+          </div>
+          <div style={{padding:16,background:'var(--main-bg)',borderRadius:8,fontSize:13,lineHeight:1.6}}>
+            {`${t('totalApplications')}: ${apps.length}`}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
