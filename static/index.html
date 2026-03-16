@@ -1000,14 +1000,17 @@ function RecapPage({ stats, savedJobs }) {
 
 /* ---- HUMAN (People Search) ---- */
 function HumanPage({ toast }) {
-  const [keywords, setKeywords] = useState('');
+  const [kw1, setKw1] = useState('');
+  const [kw2, setKw2] = useState('');
+  const [kw3, setKw3] = useState('');
   const [location, setLocation] = useState('');
   const [loading, setLoading] = useState(false);
   const [people, setPeople] = useState([]);
   const [searched, setSearched] = useState(false);
 
   const search = async () => {
-    if (!keywords.trim()) { toast(t('enterKeywords'), 'error'); return; }
+    const keywords = [kw1, kw2, kw3].filter(k => k.trim());
+    if (!keywords.length) { toast(t('enterKeywords'), 'error'); return; }
     setLoading(true); setSearched(true);
     try {
       const data = await api('/api/search/people', { method: 'POST', body: JSON.stringify({ keywords, location }) });
@@ -1027,7 +1030,7 @@ function HumanPage({ toast }) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `linkedin_${keywords.replace(/\s+/g, '_')}_${location || 'all'}.csv`;
+    a.download = `linkedin_${[kw1,kw2,kw3].filter(k=>k.trim()).join('_').replace(/\s+/g, '_')}_${location || 'all'}.csv`;
     a.click();
     URL.revokeObjectURL(url);
     toast(t('humanDownloadCsv') + ' ✓');
@@ -1038,15 +1041,23 @@ function HumanPage({ toast }) {
       <h1 className="page-title">{t('humanSearch')}</h1>
       <div className="card">
         <p className="card-subtitle" style={{marginBottom:16}}>{t('humanSubtitle')}</p>
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:16}}>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,marginBottom:12}}>
           <div>
-            <label className="input-label">{t('humanKeywords')}</label>
-            <input className="input" value={keywords} onChange={e=>setKeywords(e.target.value)} placeholder={t('humanKeywordsPlaceholder')} onKeyDown={e => e.key==='Enter' && search()} />
+            <label className="input-label">{t('humanKeywords')} 1 *</label>
+            <input className="input" value={kw1} onChange={e=>setKw1(e.target.value)} placeholder={t('humanKeywordsPlaceholder')} onKeyDown={e => e.key==='Enter' && search()} />
           </div>
           <div>
-            <label className="input-label">{t('humanLocation')}</label>
-            <input className="input" value={location} onChange={e=>setLocation(e.target.value)} placeholder={t('humanLocationPlaceholder')} onKeyDown={e => e.key==='Enter' && search()} />
+            <label className="input-label">{t('humanKeywords')} 2</label>
+            <input className="input" value={kw2} onChange={e=>setKw2(e.target.value)} placeholder="ex: directeur" onKeyDown={e => e.key==='Enter' && search()} />
           </div>
+          <div>
+            <label className="input-label">{t('humanKeywords')} 3</label>
+            <input className="input" value={kw3} onChange={e=>setKw3(e.target.value)} placeholder="ex: marketing" onKeyDown={e => e.key==='Enter' && search()} />
+          </div>
+        </div>
+        <div style={{marginBottom:16}}>
+          <label className="input-label">{t('humanLocation')}</label>
+          <input className="input" value={location} onChange={e=>setLocation(e.target.value)} placeholder={t('humanLocationPlaceholder')} onKeyDown={e => e.key==='Enter' && search()} style={{maxWidth:300}} />
         </div>
         <button className="btn btn-primary" onClick={search} disabled={loading}>{loading ? t('humanSearching') : t('humanSearchBtn')}</button>
       </div>

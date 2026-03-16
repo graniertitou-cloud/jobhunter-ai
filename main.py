@@ -963,7 +963,8 @@ Tu aides le candidat dans sa recherche d'emploi.
 
 # --- People Search ---
 class PeopleSearchRequest(BaseModel):
-    keywords: str
+    keywords: list = []       # list of up to 3 keyword strings
+    keyword: str = ""         # backward compat single keyword
     location: str = ""
 
 
@@ -1000,8 +1001,79 @@ def _extract_location(snippet: str, fallback: str) -> str:
     return fallback
 
 
-def scrape_linkedin_people(keywords: str, location: str) -> list[dict]:
-    """Search for people on LinkedIn using ddgs library."""
+def _search_ddgs(query: str, max_results: int = 80) -> list[dict]:
+    """Search using ddgs library, return raw results. Splits concatenated titles."""
+    try:
+        from ddgs import DDGS
+        raw_results = DDGS().text(query, max_results=max_results)
+        logger.info(f"DDGS: '{query}' -> {len(raw_results)} raw results")
+        # ddgs sometimes concatenates multiple LinkedIn results into one title
+        # e.g. "Name1 - Title1 | LinkedIn Name2 - Title2 | LinkedIn Name3 ..."
+        # Also: "Name1 - Title1 ... Name2 - Title2 ..."  (with ... as separator)
+        expanded = []
+        for r in raw_results:
+            title = r.get("title", "")
+            href = r.get("href", "")
+            body = r.get("body", "")
+            # Split on "| LinkedIn" or "- LinkedIn" boundaries
+            if "LinkedIn" in title and (title.count("LinkedIn") > 1 or
+                    re.search(r'LinkedIn\s+[A-ZÀ-Ÿ]', title)):
+                parts = re.split(r'\s*(?:\||-|–)\s*LinkedIn\s+', title)
+                # Last part might end with "| LinkedIn"
+                for i, part in enumerate(parts):
+                    part = re.sub(r'\s*(?:\||-|–)\s*LinkedIn\s*$', '', part).strip()
+                    if not part or len(part) < 3:
+                        continue
+                    expanded.append({"title": part, "href": href, "body": body})
+            # Also split on "... Name - Title ..." patterns (ellipsis concatenation)
+            elif title.count("...") >= 2:
+                segments = re.split(r'\.\.\.\s+', title)
+                for seg in segments:
+                    seg = seg.strip().rstrip(".")
+                    if not seg or len(seg) < 5 or " - " not in seg:
+                        continue
+                    expanded.append({"title": seg, "href": href, "body": body})
+            else:
+                expanded.append(r)
+        logger.info(f"DDGS: expanded to {len(expanded)} results")
+        return expanded
+    except Exception as e:
+        logger.warning(f"DDGS error for '{query}': {e}")
+        return []
+
+
+def _search_bing(query: str) -> list[dict]:
+    """Fallback Bing scraping, return list of {title, href, snippet}."""
+    results = []
+    try:
+        for start in [0, 50]:
+            bing_url = f"https://www.bing.com/search?q={quote(query)}&count=50&first={start}"
+            resp = requests.get(bing_url, headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            }, timeout=15)
+            if resp.status_code != 200:
+                break
+            soup = BeautifulSoup(resp.content, "lxml")
+            for li in soup.select("li.b_algo"):
+                link_el = li.find("a", href=True)
+                if not link_el:
+                    continue
+                snippet_el = li.find("p") or li.find("div", class_="b_caption")
+                results.append({
+                    "title": link_el.get_text(strip=True),
+                    "href": link_el["href"],
+                    "body": snippet_el.get_text(strip=True) if snippet_el else "",
+                })
+            time.sleep(random.uniform(0.3, 0.8))
+        logger.info(f"Bing: '{query}' -> {len(results)} results")
+    except Exception as e:
+        logger.warning(f"Bing error for '{query}': {e}")
+    return results
+
+
+def scrape_linkedin_people(keywords_list: list[str], location: str) -> list[dict]:
+    """Search for people on LinkedIn using multiple keywords."""
     people = []
     seen_urls = set()
 
@@ -1010,93 +1082,77 @@ def scrape_linkedin_people(keywords: str, location: str) -> list[dict]:
             return
         if "?" in href:
             href = href.split("?")[0]
+        if "/in/" not in href:
+            return
         seen_urls.add(href)
         people.append({
             "name": name, "title": title_role, "company": company,
             "location": loc, "linkedin_url": href, "snippet": snippet[:200],
         })
 
-    base_query = f'site:linkedin.com/in/ {keywords}'
-    if location:
-        base_query += f' {location}'
-
-    # Method 1: DuckDuckGo lite (most reliable, no JS needed)
-    try:
-        ddg_url = f"https://lite.duckduckgo.com/lite/?q={quote(base_query)}"
-        resp = requests.post(ddg_url, data={"q": base_query}, headers={
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Content-Type": "application/x-www-form-urlencoded",
-        }, timeout=15)
-        logger.info(f"DDG lite status: {resp.status_code}")
-        if resp.status_code == 200:
-            soup = BeautifulSoup(resp.content, "lxml")
-            for link in soup.find_all("a", href=True):
-                href = link["href"]
-                if "linkedin.com/in/" not in href:
+    def process_results(raw_results, loc_fallback):
+        for r in raw_results:
+            href = r.get("href", "")
+            title_text = r.get("title", "")
+            snippet = r.get("body", "")
+            # Try to find linkedin URL in href or body
+            if "linkedin.com/in/" not in href:
+                # Try to extract from body/snippet
+                li_match = re.search(r'https?://[a-z]*\.?linkedin\.com/in/[\w-]+', snippet + " " + href)
+                if li_match:
+                    href = li_match.group(0)
+                else:
                     continue
-                # Clean DDG redirect URLs
-                if "duckduckgo.com" in href and "uddg=" in href:
-                    href = unquote(href.split("uddg=")[1].split("&")[0])
-                title_text = link.get_text(strip=True)
-                if not title_text or title_text == href:
-                    continue
-                parsed = _parse_linkedin_title(title_text)
-                # Get snippet from next sibling or parent
-                snippet_td = link.find_parent("tr")
-                snippet = ""
-                if snippet_td:
-                    next_tr = snippet_td.find_next_sibling("tr")
-                    if next_tr:
-                        snippet = next_tr.get_text(strip=True)
-                loc = _extract_location(snippet, location or "")
-                add_person(parsed["name"], parsed["title"], parsed["company"], loc, href, snippet)
-    except Exception as e:
-        logger.warning(f"DDG lite error: {e}")
+            parsed = _parse_linkedin_title(title_text)
+            # Skip if name looks like an ad or not a person
+            if not parsed["name"] or len(parsed["name"]) < 2:
+                continue
+            if any(skip in parsed["name"].lower() for skip in ["recrutement", "formez", "formation", "ecole", "école"]):
+                continue
+            loc = _extract_location(snippet, loc_fallback)
+            add_person(parsed["name"], parsed["title"], parsed["company"], loc, href, snippet)
 
-    # Method 2: ddgs library (if available)
+    # Build queries — multiple variations for more results
+    queries = []
+
+    # Combined query with all keywords (most precise)
+    all_kw = [k.strip() for k in keywords_list[:3] if k.strip()]
+    if all_kw:
+        combined_exact = " ".join(f'"{k}"' for k in all_kw)
+        q = f'site:linkedin.com/in/ {combined_exact}'
+        if location:
+            q += f' "{location}"'
+        queries.append(q)
+
+    # Each keyword separately for broader results
+    for kw in all_kw:
+        q = f'site:linkedin.com/in/ "{kw}"'
+        if location:
+            q += f' "{location}"'
+        if q not in queries:
+            queries.append(q)
+
+    # Without quotes for even broader results (if single keyword has multiple words)
+    for kw in all_kw:
+        if " " in kw:
+            q = f'site:linkedin.com/in/ {kw}'
+            if location:
+                q += f' {location}'
+            if q not in queries:
+                queries.append(q)
+
+    # Search with ddgs for each query
+    for q in queries:
+        raw = _search_ddgs(q, max_results=80)
+        process_results(raw, location or "")
+        time.sleep(random.uniform(0.3, 0.8))
+
+    # Fallback: Bing for each query if ddgs found nothing
     if not people:
-        try:
-            from ddgs import DDGS
-            results = DDGS().text(base_query, max_results=50)
-            logger.info(f"DDGS library returned {len(results)} results")
-            for r in results:
-                href = r.get("href", "")
-                if "linkedin.com/in/" not in href:
-                    continue
-                title_text = r.get("title", "")
-                parsed = _parse_linkedin_title(title_text)
-                snippet = r.get("body", "")
-                loc = _extract_location(snippet, location or "")
-                add_person(parsed["name"], parsed["title"], parsed["company"], loc, href, snippet)
-        except Exception as e:
-            logger.warning(f"DDGS library error: {e}")
-
-    # Fallback: Bing scraping
-    if not people:
-        try:
-            bing_url = f"https://www.bing.com/search?q={quote(base_query)}&count=50"
-            resp = requests.get(bing_url, headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            }, timeout=15)
-            logger.info(f"Bing fallback status: {resp.status_code}")
-            if resp.status_code == 200:
-                soup = BeautifulSoup(resp.content, "lxml")
-                for li in soup.select("li.b_algo"):
-                    link_el = li.find("a", href=True)
-                    if not link_el:
-                        continue
-                    href = link_el["href"]
-                    if "linkedin.com/in/" not in href:
-                        continue
-                    title_text = link_el.get_text(strip=True)
-                    parsed = _parse_linkedin_title(title_text)
-                    snippet_el = li.find("p") or li.find("div", class_="b_caption")
-                    snippet = snippet_el.get_text(strip=True) if snippet_el else ""
-                    loc = _extract_location(snippet, location or "")
-                    add_person(parsed["name"], parsed["title"], parsed["company"], loc, href, snippet)
-        except Exception as e:
-            logger.warning(f"Bing fallback error: {e}")
+        for q in queries:
+            raw = _search_bing(q)
+            process_results(raw, location or "")
+            time.sleep(random.uniform(0.3, 0.8))
 
     return people
 
@@ -1104,5 +1160,10 @@ def scrape_linkedin_people(keywords: str, location: str) -> list[dict]:
 @app.post("/api/search/people")
 def search_people(req: PeopleSearchRequest, request: Request):
     user = require_user(request)
-    results = scrape_linkedin_people(req.keywords, req.location)
+    # Support both list and single keyword
+    kw_list = req.keywords if req.keywords else ([req.keyword] if req.keyword else [])
+    kw_list = [k for k in kw_list if k and k.strip()][:3]
+    if not kw_list:
+        return {"people": [], "count": 0}
+    results = scrape_linkedin_people(kw_list, req.location)
     return {"people": results, "count": len(results)}
