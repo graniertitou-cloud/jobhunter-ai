@@ -152,12 +152,191 @@ select.input{appearance:none;background:url("data:image/svg+xml,%3Csvg xmlns='ht
 .file-upload-icon{font-size:32px;margin-bottom:8px}
 .file-upload-text{font-size:14px;color:var(--text-secondary)}
 .file-upload-hint{font-size:12px;color:var(--text-secondary);margin-top:4px;opacity:0.7}
+/* Pink/Girly theme for English */
+html[data-lang="en"]{
+--sidebar-bg:#2d1b35;--accent:#e84393;--success:#fd79a8;--warning:#fdcb6e;
+}
+html[data-lang="en"] .sidebar{background:linear-gradient(180deg,#2d1b35 0%,#3d1f47 100%)}
+html[data-lang="en"] .nav-item.active{border-left-color:#e84393;background:rgba(232,67,147,0.12)}
+html[data-lang="en"] .btn-primary{background:#e84393}
+html[data-lang="en"] .btn-primary:hover{background:#d63384}
+html[data-lang="en"] .sort-btn.active,.toggle-btn.active{background:#e84393 !important;border-color:#e84393 !important}
+html[data-lang="en"] .score-high{background:#fd79a8}
+html[data-lang="en"] .chat-fab{background:#e84393;box-shadow:0 4px 16px rgba(232,67,147,0.4)}
+html[data-lang="en"] .chat-header{background:#e84393}
+html[data-lang="en"] .chat-msg.user{background:#e84393}
+html[data-lang="en"] .input:focus,html[data-lang="en"] .textarea:focus{border-color:#e84393}
+html[data-lang="en"] .checkbox-label input{accent-color:#e84393}
+html[data-lang="en"] .progress-fill{background:#e84393}
+html[data-lang="en"] .sidebar-logo{background:linear-gradient(135deg,#e84393,#fd79a8);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+html[data-lang="en"] .login-page{background:linear-gradient(135deg,#2d1b35 0%,#3d1f47 100%)}
+html[data-lang="en"] .google-btn:hover{border-color:#e84393;box-shadow:0 2px 8px rgba(232,67,147,0.15)}
+html[data-lang="en"] .stat-number{color:#e84393}
 </style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const { useState, useEffect, useRef, useCallback } = React;
+const { useState, useEffect, useRef, useCallback, createContext, useContext } = React;
+
+/* ---- TRANSLATIONS ---- */
+const translations = {
+  fr: {
+    // Sidebar & nav
+    dashboard: 'Dashboard', profile: 'Profil', search: 'Recherche', letter: 'Lettre', recap: 'Récap',
+    version: 'v1.0', logout: 'Déconnexion',
+    // Login
+    loginTitle: 'JobHunter AI', loginSub: 'Votre assistant intelligent pour la recherche d\'emploi.\nTrouvez, analysez et postulez plus efficacement.',
+    firstName: 'Prénom', email: 'Email', password: 'Mot de passe', loading: 'Chargement...',
+    createAccount: 'Créer mon compte', signIn: 'Se connecter',
+    alreadyAccount: 'Déjà un compte ? Se connecter', noAccount: 'Pas encore de compte ? Créer un compte',
+    // Dashboard
+    hello: 'Bonjour', completeProfile: 'Complétez votre profil pour de meilleurs résultats →',
+    jobsFound: 'Offres trouvées', jobsSaved: 'Offres sauvegardées', lettersGenerated: 'Lettres générées',
+    getStarted: 'Démarrer', launchSearch: 'Lancer une recherche', generateLetter: 'Générer une lettre',
+    // Profile
+    myProfile: 'Mon Profil', completed: 'complété', save: 'Sauvegarder', saving: 'Sauvegarde...',
+    profileSaved: 'Profil sauvegardé ✓',
+    myCVs: 'Mes CV', addCV: 'Ajouter un CV', cvSubtitle: 'Importez vos CV en PDF ou collez le texte',
+    myCoverLetters: 'Mes lettres de motivation', addCoverLetter: 'Ajouter une lettre',
+    coverLetterSubtitle: 'Ajoutez vos lettres types — JobHunter AI s\'en inspirera',
+    myGoals: 'Ce que je recherche', goalsSubtitle: 'Décrivez votre poste idéal, vos valeurs, vos critères',
+    goalsPlaceholder: 'Décrivez ce que vous recherchez...',
+    language: 'Langue', chooseLang: 'Choisissez la langue de l\'interface',
+    uploadPdf: 'Cliquez ou déposez un PDF', analyzing: 'Analyse en cours...',
+    pdfHint: 'Le texte sera extrait et analysé par l\'IA', selectPdf: 'Veuillez sélectionner un fichier PDF',
+    pdfImported: 'PDF analysé et importé ✓', name: 'Nom', cvPlaceholder: 'Le texte de votre CV...',
+    coverLetterPlaceholder: 'Le texte de votre lettre de motivation...',
+    delete: 'Supprimer', pasteText: 'Ou collez le texte directement',
+    // Search
+    jobSearch: 'Recherche d\'emploi', keywords: 'Mots-clés', keywordsPlaceholder: 'ex: chargée de projets culturels Paris',
+    locationLabel: 'Localisation', contractType: 'Type de contrat',
+    searchBtn: 'Lancer la recherche', searching: 'Recherche en cours...',
+    demoResults: 'Résultats de démonstration — le scraping a été temporairement limité',
+    jobsFoundCount: 'offres trouvées', filtered: 'filtrées', sortScore: 'Trier par score', sortDate: 'Trier par date',
+    viewOffer: 'Voir l\'offre', generateLetterBtn: 'Générer une lettre',
+    noResults: 'Aucune offre trouvée. Essayez d\'autres mots-clés.', enterKeywords: 'Entrez des mots-clés',
+    saved: 'Offre sauvegardée ✓', removed: 'Offre retirée',
+    completeProfileForScore: 'Complétez votre profil pour un scoring personnalisé.',
+    // Letter
+    coverLetterTitle: 'Lettre de motivation', savedOffer: 'Offre sauvegardée', manualDesc: 'Description manuelle',
+    selectSaved: 'Sélectionner une offre sauvegardée', chooseOffer: '-- Choisir une offre --',
+    jobDescription: 'Description du poste', pasteDescription: 'Collez la description de l\'offre ici...',
+    specificInstruction: 'Instruction spécifique (optionnel)', instructionPlaceholder: 'ex: plus courte, insiste sur mon expérience événementielle',
+    generateBtn: 'Générer la lettre', generating: 'Génération...', generatingText: 'Génération en cours...',
+    copyLetter: 'Copier la lettre', regenerate: 'Régénérer', letterCopied: 'Lettre copiée ✓',
+    selectOffer: 'Sélectionnez une offre', pasteDesc: 'Collez une description',
+    completeProfileCV: 'Veuillez d\'abord compléter votre profil avec votre CV.',
+    // Recap
+    recapTitle: 'Récapitulatif', myLastLetters: 'Mes dernières lettres', noLettersYet: 'Aucune lettre générée pour le moment.',
+    review: 'Revoir', back: '← Retour', mySavedOffers: 'Mes offres sauvegardées', noSavedOffers: 'Aucune offre sauvegardée pour le moment.',
+    view: 'Voir',
+    // Chat
+    chatTitle: 'Assistant JobHunter', chatWelcome: 'Bonjour ! Comment puis-je vous aider dans votre recherche d\'emploi ?',
+    chatPlaceholder: 'Votre message...', chatError: 'Désolé, une erreur est survenue.',
+    sessionExpired: 'Session expirée', serverError: 'Erreur serveur',
+  },
+  en: {
+    dashboard: 'Dashboard', profile: 'Profile', search: 'Search', letter: 'Letter', recap: 'Summary',
+    version: 'v1.0', logout: 'Logout',
+    loginTitle: 'JobHunter AI', loginSub: 'Your smart job search assistant.\nFind, analyze, and apply more efficiently.',
+    firstName: 'First name', email: 'Email', password: 'Password', loading: 'Loading...',
+    createAccount: 'Create my account', signIn: 'Sign in',
+    alreadyAccount: 'Already have an account? Sign in', noAccount: 'No account yet? Create one',
+    hello: 'Hello', completeProfile: 'Complete your profile for better results →',
+    jobsFound: 'Jobs found', jobsSaved: 'Saved jobs', lettersGenerated: 'Letters generated',
+    getStarted: 'Get started', launchSearch: 'Start a search', generateLetter: 'Generate a letter',
+    myProfile: 'My Profile', completed: 'completed', save: 'Save', saving: 'Saving...',
+    profileSaved: 'Profile saved ✓',
+    myCVs: 'My CVs', addCV: 'Add a CV', cvSubtitle: 'Import your CVs as PDF or paste text',
+    myCoverLetters: 'My cover letters', addCoverLetter: 'Add a letter',
+    coverLetterSubtitle: 'Add your template letters — JobHunter AI will use them as inspiration',
+    myGoals: 'What I\'m looking for', goalsSubtitle: 'Describe your ideal job, values, criteria',
+    goalsPlaceholder: 'Describe what you\'re looking for...',
+    language: 'Language', chooseLang: 'Choose the interface language',
+    uploadPdf: 'Click or drop a PDF', analyzing: 'Analyzing...',
+    pdfHint: 'Text will be extracted and analyzed by AI', selectPdf: 'Please select a PDF file',
+    pdfImported: 'PDF analyzed and imported ✓', name: 'Name', cvPlaceholder: 'Your CV text...',
+    coverLetterPlaceholder: 'Your cover letter text...',
+    delete: 'Delete', pasteText: 'Or paste text directly',
+    jobSearch: 'Job search', keywords: 'Keywords', keywordsPlaceholder: 'e.g., cultural project manager Paris',
+    locationLabel: 'Location', contractType: 'Contract type',
+    searchBtn: 'Start search', searching: 'Searching...',
+    demoResults: 'Demo results — scraping was temporarily limited',
+    jobsFoundCount: 'jobs found', filtered: 'filtered', sortScore: 'Sort by score', sortDate: 'Sort by date',
+    viewOffer: 'View offer', generateLetterBtn: 'Generate letter',
+    noResults: 'No jobs found. Try different keywords.', enterKeywords: 'Enter keywords',
+    saved: 'Job saved ✓', removed: 'Job removed',
+    completeProfileForScore: 'Complete your profile for personalized scoring.',
+    coverLetterTitle: 'Cover letter', savedOffer: 'Saved offer', manualDesc: 'Manual description',
+    selectSaved: 'Select a saved offer', chooseOffer: '-- Choose an offer --',
+    jobDescription: 'Job description', pasteDescription: 'Paste the job description here...',
+    specificInstruction: 'Specific instruction (optional)', instructionPlaceholder: 'e.g., shorter, emphasize my event experience',
+    generateBtn: 'Generate letter', generating: 'Generating...', generatingText: 'Generating...',
+    copyLetter: 'Copy letter', regenerate: 'Regenerate', letterCopied: 'Letter copied ✓',
+    selectOffer: 'Select an offer', pasteDesc: 'Paste a description',
+    completeProfileCV: 'Please complete your profile with your CV first.',
+    recapTitle: 'Summary', myLastLetters: 'My recent letters', noLettersYet: 'No letters generated yet.',
+    review: 'Review', back: '← Back', mySavedOffers: 'My saved offers', noSavedOffers: 'No saved offers yet.',
+    view: 'View',
+    chatTitle: 'JobHunter Assistant', chatWelcome: 'Hi! How can I help you with your job search?',
+    chatPlaceholder: 'Your message...', chatError: 'Sorry, an error occurred.',
+    sessionExpired: 'Session expired', serverError: 'Server error',
+  },
+  titou: {
+    dashboard: 'Dachborde', profile: 'Profeel', search: 'Rechairche', letter: 'Laitre', recap: 'Rékapitolatif',
+    version: 'v1.0', logout: 'Déconexiom',
+    loginTitle: 'JobHunteur AI', loginSub: 'Votre asistant intéligent pour la rechairche d\'enploi.\nTrouvé, analisé et postulé plus éficacement.',
+    firstName: 'Prénon', email: 'Émail', password: 'Mot de pase', loading: 'Chargemen...',
+    createAccount: 'Créé mon conpte', signIn: 'Se conècter',
+    alreadyAccount: 'Déja un conpte ? Se conècter', noAccount: 'Pa encore de conpte ? Créé un conpte',
+    hello: 'Bonjour', completeProfile: 'Conplétez votre profeel pour de meyeurs résultats →',
+    jobsFound: 'Offres trouvé', jobsSaved: 'Offres sauvgardé', lettersGenerated: 'Laitres généré',
+    getStarted: 'Démaré', launchSearch: 'Lancé une rechairche', generateLetter: 'Généré une laitre',
+    myProfile: 'Mon Profeel', completed: 'conplété', save: 'Sovgarder', saving: 'Sovgarde...',
+    profileSaved: 'Profeel sovgardé ✓',
+    myCVs: 'Mé CV', addCV: 'Ajouté un CV', cvSubtitle: 'Inportez vos CV en PDF ou collé le texte',
+    myCoverLetters: 'Mé laitres de motivacion', addCoverLetter: 'Ajouté une laitre',
+    coverLetterSubtitle: 'Ajoutez vos laitres tipes — JobHunteur AI s\'en insiprera',
+    myGoals: 'Ce que je rechairche', goalsSubtitle: 'Décrivé votre poste idéale, vos valeurs, vos critaires',
+    goalsPlaceholder: 'Décrivé ce que vous rechairché...',
+    language: 'Lengue', chooseLang: 'Choisicez la lengue de l\'intairface',
+    uploadPdf: 'Cliké ou déposé un PDF', analyzing: 'Analise en cour...',
+    pdfHint: 'Le texte sera éxtré et analisé par l\'IA', selectPdf: 'Véyé séléctioné un fichié PDF',
+    pdfImported: 'PDF analisé et inporté ✓', name: 'Non', cvPlaceholder: 'Le texte de votre CV...',
+    coverLetterPlaceholder: 'Le texte de votre laitre de motivacion...',
+    delete: 'Suprimé', pasteText: 'Ou collé le texte diréctement',
+    jobSearch: 'Rechairche d\'enploi', keywords: 'Mots-clé', keywordsPlaceholder: 'ex: chargé de projés culturèls Paris',
+    locationLabel: 'Localisacion', contractType: 'Tipe de contrat',
+    searchBtn: 'Lancé la rechairche', searching: 'Rechairche en cour...',
+    demoResults: 'Résultats de démonstracion — le scrapin a été tenporèrement limité',
+    jobsFoundCount: 'offres trouvé', filtered: 'filtré', sortScore: 'Trié par score', sortDate: 'Trié par date',
+    viewOffer: 'Voire l\'offre', generateLetterBtn: 'Généré une laitre',
+    noResults: 'Aucunne offre trouvé. Éssayé d\'otres mots-clé.', enterKeywords: 'Entré des mots-clé',
+    saved: 'Offre sovgardé ✓', removed: 'Offre retiré',
+    completeProfileForScore: 'Conplétez votre profeel pour un scorin personalisé.',
+    coverLetterTitle: 'Laitre de motivacion', savedOffer: 'Offre sovgardé', manualDesc: 'Descripcion manuèle',
+    selectSaved: 'Séléctioné une offre sovgardé', chooseOffer: '-- Choisire une offre --',
+    jobDescription: 'Descripcion du poste', pasteDescription: 'Collé la descripcion de l\'offre ici...',
+    specificInstruction: 'Instruccion spécifike (opcionel)', instructionPlaceholder: 'ex: plus courte, insiste sur mon éxpérience événemencièle',
+    generateBtn: 'Généré la laitre', generating: 'Généracion...', generatingText: 'Généracion en cour...',
+    copyLetter: 'Copié la laitre', regenerate: 'Régénéré', letterCopied: 'Laitre copié ✓',
+    selectOffer: 'Séléctioné une offre', pasteDesc: 'Collé une descripcion',
+    completeProfileCV: 'Véyé d\'abord conplété votre profeel avec votre CV.',
+    recapTitle: 'Rékapitolatif', myLastLetters: 'Mé dairnières laitres', noLettersYet: 'Aucunne laitre généré pour le momen.',
+    review: 'Revoire', back: '← Retour', mySavedOffers: 'Mé offres sovgardé', noSavedOffers: 'Aucunne offre sovgardé pour le momen.',
+    view: 'Voire',
+    chatTitle: 'Asistant JobHunteur', chatWelcome: 'Bonjour ! Commen puis-je vous aidé dans votre rechairche d\'enploi ?',
+    chatPlaceholder: 'Votre méssage...', chatError: 'Désolé, une éreur est survenu.',
+    sessionExpired: 'Séssion éxpiré', serverError: 'Éreur serveure',
+  },
+};
+
+function getLang() { return localStorage.getItem('jh_lang') || 'fr'; }
+function setLang(l) { localStorage.setItem('jh_lang', l); document.documentElement.setAttribute('data-lang', l); }
+function t(key) { return (translations[getLang()] || translations.fr)[key] || translations.fr[key] || key; }
+// Apply lang on load
+document.documentElement.setAttribute('data-lang', getLang());
 
 /* ---- ICONS ---- */
 const Icon = {
@@ -228,30 +407,30 @@ function LoginPage({ onLogin }) {
   return (
     <div className="login-page">
       <div className="login-card">
-        <div className="login-logo">JobHunter AI</div>
-        <p className="login-sub">Votre assistant intelligent pour la recherche d'emploi.<br/>Trouvez, analysez et postulez plus efficacement.</p>
+        <div className="login-logo">{t('loginTitle')}</div>
+        <p className="login-sub" style={{whiteSpace:'pre-line'}}>{t('loginSub')}</p>
         <form onSubmit={handleSubmit} style={{textAlign:'left'}}>
           {isRegister && (
             <div style={{marginBottom:12}}>
-              <label className="input-label">Prénom</label>
-              <input className="input" placeholder="Votre prénom" value={name} onChange={e => setName(e.target.value)} />
+              <label className="input-label">{t('firstName')}</label>
+              <input className="input" placeholder={t('firstName')} value={name} onChange={e => setName(e.target.value)} />
             </div>
           )}
           <div style={{marginBottom:12}}>
-            <label className="input-label">Email</label>
+            <label className="input-label">{t('email')}</label>
             <input className="input" type="email" placeholder="votre@email.com" value={email} onChange={e => setEmail(e.target.value)} required />
           </div>
           <div style={{marginBottom:16}}>
-            <label className="input-label">Mot de passe</label>
+            <label className="input-label">{t('password')}</label>
             <input className="input" type="password" placeholder="••••••" value={password} onChange={e => setPassword(e.target.value)} required />
           </div>
           {error && <p style={{color:'var(--danger)',fontSize:13,marginBottom:12}}>{error}</p>}
           <button className="btn btn-primary" type="submit" disabled={loading} style={{width:'100%',justifyContent:'center',padding:'14px',fontSize:15}}>
-            {loading ? 'Chargement...' : (isRegister ? 'Créer mon compte' : 'Se connecter')}
+            {loading ? t('loading') : (isRegister ? t('createAccount') : t('signIn'))}
           </button>
         </form>
         <p style={{fontSize:13,color:'var(--text-secondary)',marginTop:20,cursor:'pointer'}} onClick={() => { setIsRegister(!isRegister); setError(''); }}>
-          {isRegister ? 'Déjà un compte ? Se connecter' : 'Pas encore de compte ? Créer un compte'}
+          {isRegister ? t('alreadyAccount') : t('noAccount')}
         </p>
       </div>
     </div>
@@ -264,9 +443,10 @@ function App() {
   const [page, setPage] = useState('dashboard');
   const [toasts, setToasts] = useState([]);
   const [chatOpen, setChatOpen] = useState(false);
-  const [profile, setProfile] = useState({ cv: '', cover_letter: '', goals: '' });
+  const [profile, setProfile] = useState({ cv: '', cover_letter: '', goals: '', cvs: [], cover_letters: [], language: 'fr' });
   const [stats, setStats] = useState({ total_found: 0, saved: 0, letters: 0 });
   const [savedJobs, setSavedJobs] = useState([]);
+  const [, setLangTick] = useState(0); // force re-render on lang change
 
   const isLoggedIn = !!getToken() && !!user;
 
@@ -277,7 +457,11 @@ function App() {
   }, []);
 
   const loadProfile = useCallback(async () => {
-    try { const p = await api('/api/profile'); setProfile(p); } catch(e) {}
+    try {
+      const p = await api('/api/profile');
+      setProfile(p);
+      if (p.language) { setLang(p.language); setLangTick(n => n + 1); }
+    } catch(e) {}
   }, []);
   const loadStats = useCallback(async () => {
     try { const s = await api('/api/stats'); setStats(s); } catch(e) {}
@@ -288,34 +472,41 @@ function App() {
 
   useEffect(() => { if (isLoggedIn) { loadProfile(); loadStats(); loadSaved(); } }, [isLoggedIn]);
 
+  const onLangChange = (newLang) => { setLang(newLang); setLangTick(n => n + 1); };
   const logout = () => { clearToken(); setUser(null); };
 
   if (!isLoggedIn) return <><LoginPage onLogin={setUser} /><ToastContainer toasts={toasts} /></>;
 
-  const profileComplete = profile.cv && profile.cover_letter && profile.goals;
-  const pages = { dashboard: 'Dashboard', profile: 'Profil', search: 'Recherche', letter: 'Lettre', recap: 'Récap' };
-  const icons = { dashboard: Icon.Dashboard, profile: Icon.Profile, search: Icon.Search, letter: Icon.Letter, recap: Icon.Recap };
+  const profileComplete = (profile.cvs?.length > 0 || profile.cv) && (profile.cover_letters?.length > 0 || profile.cover_letter) && profile.goals;
+  const navItems = [
+    { key: 'dashboard', icon: Icon.Dashboard },
+    { key: 'profile', icon: Icon.Profile },
+    { key: 'search', icon: Icon.Search },
+    { key: 'letter', icon: Icon.Letter },
+    { key: 'recap', icon: Icon.Recap },
+  ];
 
   return (
     <div className="app">
       <div className="sidebar">
         <div className="sidebar-logo">JobHunter AI</div>
         <nav className="sidebar-nav">
-          {Object.keys(pages).map(p => {
-            const Ic = icons[p];
-            return <div key={p} className={`nav-item ${page===p?'active':''}`} onClick={() => { setPage(p); if(p==='recap'||p==='dashboard'){loadStats();loadSaved();} }}><Ic />{pages[p]}</div>;
-          })}
+          {navItems.map(({ key, icon: Ic }) => (
+            <div key={key} className={`nav-item ${page===key?'active':''}`} onClick={() => { setPage(key); if(key==='recap'||key==='dashboard'){loadStats();loadSaved();} }}>
+              <Ic />{t(key)}
+            </div>
+          ))}
         </nav>
-        <div className="sidebar-version">v1.0</div>
+        <div className="sidebar-version">{t('version')}</div>
         <div className="sidebar-user">
           <div className="sidebar-avatar" style={{background:'var(--accent)',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:14,fontWeight:600}}>{(user?.name||'U')[0]}</div>
           <span className="sidebar-username">{user?.name || user?.email || 'Utilisateur'}</span>
-          <button className="sidebar-logout" onClick={logout} title="Déconnexion"><Icon.Logout /></button>
+          <button className="sidebar-logout" onClick={logout} title={t('logout')}><Icon.Logout /></button>
         </div>
       </div>
       <div className="main">
         {page === 'dashboard' && <DashboardPage stats={stats} profileComplete={profileComplete} setPage={setPage} user={user} />}
-        {page === 'profile' && <ProfilePage profile={profile} setProfile={setProfile} loadProfile={loadProfile} loadStats={loadStats} toast={toast} />}
+        {page === 'profile' && <ProfilePage profile={profile} setProfile={setProfile} loadProfile={loadProfile} loadStats={loadStats} toast={toast} onLangChange={onLangChange} />}
         {page === 'search' && <SearchPage savedJobs={savedJobs} loadSaved={loadSaved} loadStats={loadStats} toast={toast} setPage={setPage} setStats={setStats} />}
         {page === 'letter' && <LetterPage savedJobs={savedJobs} loadStats={loadStats} toast={toast} />}
         {page === 'recap' && <RecapPage stats={stats} savedJobs={savedJobs} />}
@@ -329,108 +520,191 @@ function App() {
 
 /* ---- DASHBOARD ---- */
 function DashboardPage({ stats, profileComplete, setPage, user }) {
-  const firstName = (user?.name || '').split(' ')[0] || 'Bonjour';
+  const firstName = (user?.name || '').split(' ')[0] || '';
   return (
     <div>
-      <h1 className="page-title">Bonjour {firstName} 👋</h1>
-      {!profileComplete && <div className="banner banner-warning" style={{cursor:'pointer'}} onClick={() => setPage('profile')}>Complétez votre profil pour de meilleurs résultats →</div>}
+      <h1 className="page-title">{t('hello')} {firstName} 👋</h1>
+      {!profileComplete && <div className="banner banner-warning" style={{cursor:'pointer'}} onClick={() => setPage('profile')}>{t('completeProfile')}</div>}
       <div className="stats-row">
-        <div className="stat-card"><div className="stat-number">{stats.total_found}</div><div className="stat-label">Offres trouvées</div></div>
-        <div className="stat-card"><div className="stat-number">{stats.saved}</div><div className="stat-label">Offres sauvegardées</div></div>
-        <div className="stat-card"><div className="stat-number">{stats.letters}</div><div className="stat-label">Lettres générées</div></div>
+        <div className="stat-card"><div className="stat-number">{stats.total_found}</div><div className="stat-label">{t('jobsFound')}</div></div>
+        <div className="stat-card"><div className="stat-number">{stats.saved}</div><div className="stat-label">{t('jobsSaved')}</div></div>
+        <div className="stat-card"><div className="stat-number">{stats.letters}</div><div className="stat-label">{t('lettersGenerated')}</div></div>
       </div>
       <div className="card">
-        <h3 className="card-title">Démarrer</h3>
+        <h3 className="card-title">{t('getStarted')}</h3>
         <div className="action-grid" style={{marginTop:16}}>
-          <button className="btn btn-primary btn-lg" onClick={() => setPage('search')}>Lancer une recherche</button>
-          <button className="btn btn-outline btn-lg" onClick={() => setPage('letter')}>Générer une lettre</button>
+          <button className="btn btn-primary btn-lg" onClick={() => setPage('search')}>{t('launchSearch')}</button>
+          <button className="btn btn-outline btn-lg" onClick={() => setPage('letter')}>{t('generateLetter')}</button>
         </div>
       </div>
     </div>
   );
 }
 
-/* ---- PROFILE ---- */
-function ProfilePage({ profile, setProfile, loadProfile, loadStats, toast }) {
-  const [form, setForm] = useState({ ...profile });
-  const [saving, setSaving] = useState(false);
+/* ---- PDF UPLOAD COMPONENT ---- */
+function PdfUploadZone({ onTextExtracted, toast, label }) {
   const [uploading, setUploading] = useState(false);
   const [dragging, setDragging] = useState(false);
   const fileRef = useRef();
 
-  useEffect(() => { setForm({ ...profile }); }, [profile]);
+  const uploadPdf = async (file) => {
+    if (!file || !file.name.toLowerCase().endsWith('.pdf')) {
+      toast(t('selectPdf'), 'error'); return;
+    }
+    setUploading(true);
+    try {
+      const fd = new FormData(); fd.append('file', file);
+      const data = await apiUpload('/api/profile/upload-pdf', fd);
+      onTextExtracted(data.text, file.name);
+      toast(t('pdfImported'));
+    } catch(e) { toast(e.message, 'error'); }
+    setUploading(false);
+  };
 
-  const filled = [form.cv, form.cover_letter, form.goals].filter(Boolean).length;
-  const pct = Math.round((filled / 3) * 100);
+  return (
+    <div className={`file-upload ${dragging ? 'dragging' : ''}`}
+      onDrop={e => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files[0]; if (f) uploadPdf(f); }}
+      onDragOver={e => { e.preventDefault(); setDragging(true); }}
+      onDragLeave={() => setDragging(false)}
+      onClick={() => fileRef.current?.click()}>
+      <input ref={fileRef} type="file" accept=".pdf" style={{display:'none'}} onChange={e => e.target.files[0] && uploadPdf(e.target.files[0])} />
+      {uploading ? (
+        <><div className="spinner" style={{margin:'0 auto 8px'}}/><div className="file-upload-text">{t('analyzing')}</div></>
+      ) : (
+        <><div className="file-upload-icon"><Icon.Upload /></div>
+        <div className="file-upload-text">{label || t('uploadPdf')}</div>
+        <div className="file-upload-hint">{t('pdfHint')}</div></>
+      )}
+    </div>
+  );
+}
+
+/* ---- PROFILE ---- */
+function ProfilePage({ profile, setProfile, loadProfile, loadStats, toast, onLangChange }) {
+  const [cvs, setCvs] = useState(profile.cvs || []);
+  const [coverLetters, setCoverLetters] = useState(profile.cover_letters || []);
+  const [goals, setGoals] = useState(profile.goals || '');
+  const [lang, setLangState] = useState(profile.language || getLang());
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setCvs(profile.cvs && profile.cvs.length > 0 ? profile.cvs : []);
+    setCoverLetters(profile.cover_letters && profile.cover_letters.length > 0 ? profile.cover_letters : []);
+    setGoals(profile.goals || '');
+    setLangState(profile.language || getLang());
+  }, [profile]);
+
+  const filledCount = [(cvs.length > 0), (coverLetters.length > 0), goals].filter(Boolean).length;
+  const pct = Math.round((filledCount / 3) * 100);
 
   const save = async () => {
     setSaving(true);
     try {
-      await api('/api/profile/save', { method: 'POST', body: JSON.stringify(form) });
-      toast('Profil sauvegardé ✓');
+      await api('/api/profile/save', { method: 'POST', body: JSON.stringify({
+        cv: cvs[0]?.content || '', cover_letter: coverLetters[0]?.content || '', goals,
+        cvs, cover_letters: coverLetters, language: lang
+      })});
+      toast(t('profileSaved'));
+      setLang(lang);
+      if (onLangChange) onLangChange(lang);
       await loadProfile();
     } catch(e) { toast(e.message, 'error'); }
     setSaving(false);
   };
 
-  const uploadPdf = async (file) => {
-    if (!file || !file.name.toLowerCase().endsWith('.pdf')) {
-      toast('Veuillez sélectionner un fichier PDF', 'error');
-      return;
-    }
-    setUploading(true);
-    try {
-      const fd = new FormData();
-      fd.append('file', file);
-      const data = await apiUpload('/api/profile/upload-cv', fd);
-      setForm(f => ({ ...f, cv: data.cv }));
-      toast('CV analysé et importé ✓');
-      await loadProfile();
-    } catch(e) { toast(e.message, 'error'); }
-    setUploading(false);
-  };
+  const addCv = () => setCvs([...cvs, { name: `CV ${cvs.length + 1}`, content: '' }]);
+  const removeCv = (i) => setCvs(cvs.filter((_, idx) => idx !== i));
+  const updateCv = (i, field, val) => setCvs(cvs.map((c, idx) => idx === i ? { ...c, [field]: val } : c));
 
-  const onDrop = (e) => { e.preventDefault(); setDragging(false); const file = e.dataTransfer.files[0]; if (file) uploadPdf(file); };
-  const onDragOver = (e) => { e.preventDefault(); setDragging(true); };
-  const onDragLeave = () => setDragging(false);
+  const addCl = () => setCoverLetters([...coverLetters, { name: `Lettre ${coverLetters.length + 1}`, content: '' }]);
+  const removeCl = (i) => setCoverLetters(coverLetters.filter((_, idx) => idx !== i));
+  const updateCl = (i, field, val) => setCoverLetters(coverLetters.map((c, idx) => idx === i ? { ...c, [field]: val } : c));
+
+  const changeLang = (newLang) => {
+    setLangState(newLang);
+    setLang(newLang);
+    if (onLangChange) onLangChange(newLang);
+  };
 
   return (
     <div>
-      <h1 className="page-title">Mon Profil</h1>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+        <h1 className="page-title" style={{marginBottom:0}}>{t('myProfile')}</h1>
+        <button className="btn btn-primary" onClick={save} disabled={saving} style={{flexShrink:0}}>
+          {saving ? t('saving') : t('save')}
+        </button>
+      </div>
       <div style={{marginBottom:24}}>
         <div className="progress-bar"><div className="progress-fill" style={{width:`${pct}%`}}/></div>
-        <div className="progress-label">{pct}% complété</div>
+        <div className="progress-label">{pct}% {t('completed')}</div>
       </div>
+
+      {/* Language selector */}
       <div className="card">
-        <h3 className="card-title">Mon CV</h3>
-        <p className="card-subtitle">Importez votre CV en PDF — l'IA l'analysera automatiquement</p>
-        <div className={`file-upload ${dragging ? 'dragging' : ''}`}
-          onDrop={onDrop} onDragOver={onDragOver} onDragLeave={onDragLeave}
-          onClick={() => fileRef.current?.click()}>
-          <input ref={fileRef} type="file" accept=".pdf" style={{display:'none'}} onChange={e => e.target.files[0] && uploadPdf(e.target.files[0])} />
-          {uploading ? (
-            <><div className="spinner" style={{margin:'0 auto 8px'}}/><div className="file-upload-text">Analyse du CV en cours...</div></>
-          ) : (
-            <><div className="file-upload-icon"><Icon.Upload /></div>
-            <div className="file-upload-text">Cliquez ou déposez votre CV (PDF)</div>
-            <div className="file-upload-hint">Le texte sera extrait et analysé par l'IA</div></>
-          )}
+        <h3 className="card-title">{t('language')}</h3>
+        <p className="card-subtitle">{t('chooseLang')}</p>
+        <div className="toggle-row">
+          <button className={`toggle-btn ${lang==='fr'?'active':''}`} onClick={() => changeLang('fr')}>Français</button>
+          <button className={`toggle-btn ${lang==='en'?'active':''}`} onClick={() => changeLang('en')}>English</button>
+          <button className={`toggle-btn ${lang==='titou'?'active':''}`} onClick={() => changeLang('titou')} style={lang==='titou'?{background:'#f59e0b',borderColor:'#f59e0b'}:{}}>Titou 🤪</button>
         </div>
-        <p className="card-subtitle" style={{marginBottom:8,marginTop:8}}>Ou collez le texte directement</p>
-        <textarea className="textarea" style={{minHeight:180}} value={form.cv} onChange={e => setForm({...form, cv: e.target.value})} placeholder="Le texte de votre CV apparaîtra ici après import..."/>
       </div>
+
+      {/* CVs */}
       <div className="card">
-        <h3 className="card-title">Ma lettre de motivation type</h3>
-        <p className="card-subtitle">Collez un exemple de lettre — JobHunter AI s'en inspirera pour votre style</p>
-        <textarea className="textarea" style={{minHeight:200}} value={form.cover_letter} onChange={e => setForm({...form, cover_letter: e.target.value})} placeholder="Collez un exemple de lettre de motivation..."/>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+          <div>
+            <h3 className="card-title">{t('myCVs')}</h3>
+            <p className="card-subtitle">{t('cvSubtitle')}</p>
+          </div>
+          <button className="btn btn-outline" onClick={addCv} style={{flexShrink:0}}>{t('addCV')}</button>
+        </div>
+        {cvs.length === 0 && <p style={{color:'var(--text-secondary)',fontSize:13,textAlign:'center',padding:20}}>
+          {t('addCV')} ↗
+        </p>}
+        {cvs.map((cv, i) => (
+          <div key={i} style={{borderTop: i > 0 ? '1px solid var(--border)' : 'none', paddingTop: i > 0 ? 16 : 0, marginTop: i > 0 ? 16 : 0}}>
+            <div style={{display:'flex',gap:12,alignItems:'center',marginBottom:8}}>
+              <input className="input" style={{flex:1}} value={cv.name} onChange={e => updateCv(i, 'name', e.target.value)} placeholder={t('name')} />
+              <button className="btn btn-outline" style={{color:'var(--danger)',borderColor:'var(--danger)',fontSize:12,padding:'6px 12px'}} onClick={() => removeCv(i)}>{t('delete')}</button>
+            </div>
+            <PdfUploadZone toast={toast} onTextExtracted={(text, filename) => updateCv(i, 'content', text)} />
+            <p className="card-subtitle" style={{marginBottom:6,marginTop:8}}>{t('pasteText')}</p>
+            <textarea className="textarea" style={{minHeight:120}} value={cv.content} onChange={e => updateCv(i, 'content', e.target.value)} placeholder={t('cvPlaceholder')} />
+          </div>
+        ))}
       </div>
+
+      {/* Cover letters */}
       <div className="card">
-        <h3 className="card-title">Ce que je recherche</h3>
-        <p className="card-subtitle">Décrivez votre poste idéal, vos valeurs, vos critères</p>
-        <textarea className="textarea" style={{minHeight:150}} value={form.goals} onChange={e => setForm({...form, goals: e.target.value})} placeholder="Décrivez ce que vous recherchez..."/>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+          <div>
+            <h3 className="card-title">{t('myCoverLetters')}</h3>
+            <p className="card-subtitle">{t('coverLetterSubtitle')}</p>
+          </div>
+          <button className="btn btn-outline" onClick={addCl} style={{flexShrink:0}}>{t('addCoverLetter')}</button>
+        </div>
+        {coverLetters.length === 0 && <p style={{color:'var(--text-secondary)',fontSize:13,textAlign:'center',padding:20}}>
+          {t('addCoverLetter')} ↗
+        </p>}
+        {coverLetters.map((cl, i) => (
+          <div key={i} style={{borderTop: i > 0 ? '1px solid var(--border)' : 'none', paddingTop: i > 0 ? 16 : 0, marginTop: i > 0 ? 16 : 0}}>
+            <div style={{display:'flex',gap:12,alignItems:'center',marginBottom:8}}>
+              <input className="input" style={{flex:1}} value={cl.name} onChange={e => updateCl(i, 'name', e.target.value)} placeholder={t('name')} />
+              <button className="btn btn-outline" style={{color:'var(--danger)',borderColor:'var(--danger)',fontSize:12,padding:'6px 12px'}} onClick={() => removeCl(i)}>{t('delete')}</button>
+            </div>
+            <PdfUploadZone toast={toast} onTextExtracted={(text, filename) => updateCl(i, 'content', text)} />
+            <p className="card-subtitle" style={{marginBottom:6,marginTop:8}}>{t('pasteText')}</p>
+            <textarea className="textarea" style={{minHeight:120}} value={cl.content} onChange={e => updateCl(i, 'content', e.target.value)} placeholder={t('coverLetterPlaceholder')} />
+          </div>
+        ))}
       </div>
-      <div style={{display:'flex',justifyContent:'flex-end',marginTop:8}}>
-        <button className="btn btn-primary" onClick={save} disabled={saving}>{saving ? 'Sauvegarde...' : 'Sauvegarder'}</button>
+
+      {/* Goals */}
+      <div className="card">
+        <h3 className="card-title">{t('myGoals')}</h3>
+        <p className="card-subtitle">{t('goalsSubtitle')}</p>
+        <textarea className="textarea" style={{minHeight:150}} value={goals} onChange={e => setGoals(e.target.value)} placeholder={t('goalsPlaceholder')} />
       </div>
     </div>
   );
@@ -453,7 +727,7 @@ function SearchPage({ savedJobs, loadSaved, loadStats, toast, setPage, setStats 
   const toggleContract = (c) => setContracts({...contracts, [c]: !contracts[c]});
 
   const search = async () => {
-    if (!keywords.trim()) { toast('Entrez des mots-clés', 'error'); return; }
+    if (!keywords.trim()) { toast(t('enterKeywords'), 'error'); return; }
     setLoading(true); setSearched(true);
     try {
       const plats = Object.entries(platforms).filter(([_,v])=>v).map(([k])=>k);
@@ -468,7 +742,7 @@ function SearchPage({ savedJobs, loadSaved, loadStats, toast, setPage, setStats 
   const toggleSave = async (job) => {
     try {
       const res = await api('/api/jobs/save', { method: 'POST', body: JSON.stringify(job) });
-      toast(res.status === 'saved' ? 'Offre sauvegardée ✓' : 'Offre retirée');
+      toast(res.status === 'saved' ? t('saved') : t('removed'));
       await loadSaved(); await loadStats();
     } catch(e) { toast(e.message, 'error'); }
   };
@@ -485,15 +759,15 @@ function SearchPage({ savedJobs, loadSaved, loadStats, toast, setPage, setStats 
 
   return (
     <div>
-      <h1 className="page-title">Recherche d'emploi</h1>
+      <h1 className="page-title">{t('jobSearch')}</h1>
       <div className="card">
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:16}}>
           <div>
-            <label className="input-label">Mots-clés</label>
-            <input className="input" value={keywords} onChange={e=>setKeywords(e.target.value)} placeholder="ex: chargée de projets culturels Paris" onKeyDown={e => e.key==='Enter' && search()} />
+            <label className="input-label">{t('keywords')}</label>
+            <input className="input" value={keywords} onChange={e=>setKeywords(e.target.value)} placeholder={t('keywordsPlaceholder')} onKeyDown={e => e.key==='Enter' && search()} />
           </div>
           <div>
-            <label className="input-label">Localisation</label>
+            <label className="input-label">{t('locationLabel')}</label>
             <input className="input" value={location} onChange={e=>setLocation(e.target.value)} placeholder="France" />
           </div>
         </div>
@@ -502,7 +776,7 @@ function SearchPage({ savedJobs, loadSaved, loadStats, toast, setPage, setStats 
           <label className="checkbox-label"><input type="checkbox" checked={platforms.wttj} onChange={()=>togglePlatform('wttj')} />Welcome to the Jungle</label>
           <label className="checkbox-label"><input type="checkbox" checked={platforms.francetravail} onChange={()=>togglePlatform('francetravail')} />France Travail</label>
         </div>
-        <label className="input-label" style={{marginTop:4}}>Type de contrat</label>
+        <label className="input-label" style={{marginTop:4}}>{t('contractType')}</label>
         <div className="checkbox-row">
           <label className="checkbox-label"><input type="checkbox" checked={contracts.cdi} onChange={()=>toggleContract('cdi')} />CDI</label>
           <label className="checkbox-label"><input type="checkbox" checked={contracts.cdd} onChange={()=>toggleContract('cdd')} />CDD</label>
@@ -510,17 +784,17 @@ function SearchPage({ savedJobs, loadSaved, loadStats, toast, setPage, setStats 
           <label className="checkbox-label"><input type="checkbox" checked={contracts.alternance} onChange={()=>toggleContract('alternance')} />Alternance</label>
           <label className="checkbox-label"><input type="checkbox" checked={contracts.freelance} onChange={()=>toggleContract('freelance')} />Freelance</label>
         </div>
-        <button className="btn btn-primary" onClick={search} disabled={loading}>{loading ? 'Recherche en cours...' : 'Lancer la recherche'}</button>
+        <button className="btn btn-primary" onClick={search} disabled={loading}>{loading ? t('searching') : t('searchBtn')}</button>
       </div>
-      {loading && <div><div className="spinner"/><div className="loading-text">Recherche en cours...</div></div>}
-      {isDemo && !loading && <div className="banner banner-info">Résultats de démonstration — le scraping a été temporairement limité</div>}
+      {loading && <div><div className="spinner"/><div className="loading-text">{t('searching')}</div></div>}
+      {isDemo && !loading && <div className="banner banner-info">{t('demoResults')}</div>}
       {searched && !loading && jobs.length > 0 && (
         <div>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
-            <h3>{filtered.length} offres trouvées{filtered.length < jobs.length ? ` (${jobs.length - filtered.length} filtrées)` : ''}</h3>
+            <h3>{filtered.length} {t('jobsFoundCount')}{filtered.length < jobs.length ? ` (${jobs.length - filtered.length} ${t('filtered')})` : ''}</h3>
             <div className="sort-bar">
-              <button className={`sort-btn ${sortBy==='score'?'active':''}`} onClick={()=>setSortBy('score')}>Trier par score</button>
-              <button className={`sort-btn ${sortBy==='date'?'active':''}`} onClick={()=>setSortBy('date')}>Trier par date</button>
+              <button className={`sort-btn ${sortBy==='score'?'active':''}`} onClick={()=>setSortBy('score')}>{t('sortScore')}</button>
+              <button className={`sort-btn ${sortBy==='date'?'active':''}`} onClick={()=>setSortBy('date')}>{t('sortDate')}</button>
             </div>
           </div>
           {sorted.map((job, i) => {
@@ -540,15 +814,15 @@ function SearchPage({ savedJobs, loadSaved, loadStats, toast, setPage, setStats 
                 </div>
                 <div className="job-actions">
                   <button className="star-btn" onClick={() => toggleSave(job)}><Icon.Star filled={isSaved} /></button>
-                  {job.url && job.url !== '#' && <a href={job.url} target="_blank" rel="noopener noreferrer" className="btn btn-outline" style={{fontSize:12,padding:'6px 12px'}}>Voir l'offre</a>}
-                  <button className="btn btn-primary" style={{fontSize:12,padding:'6px 12px'}} onClick={() => setPage('letter')}>Générer une lettre</button>
+                  {job.url && job.url !== '#' && <a href={job.url} target="_blank" rel="noopener noreferrer" className="btn btn-outline" style={{fontSize:12,padding:'6px 12px'}}>{t('viewOffer')}</a>}
+                  <button className="btn btn-primary" style={{fontSize:12,padding:'6px 12px'}} onClick={() => setPage('letter')}>{t('generateLetterBtn')}</button>
                 </div>
               </div>
             );
           })}
         </div>
       )}
-      {searched && !loading && jobs.length === 0 && <div className="card" style={{textAlign:'center',color:'var(--text-secondary)'}}>Aucune offre trouvée. Essayez d'autres mots-clés.</div>}
+      {searched && !loading && jobs.length === 0 && <div className="card" style={{textAlign:'center',color:'var(--text-secondary)'}}>{t('noResults')}</div>}
     </div>
   );
 }
@@ -564,18 +838,18 @@ function LetterPage({ savedJobs, loadStats, toast }) {
   const [letterJob, setLetterJob] = useState({ title: '', company: '' });
 
   const generate = async () => {
-    let jobTitle = '', company = '', jobDesc = '';
+    let jobTitle = '', company = '', jobDesc = '', jobUrl = '', jobLocation = '', jobExplanation = '';
     if (mode === 'saved') {
-      if (!selectedJob) { toast('Sélectionnez une offre', 'error'); return; }
+      if (!selectedJob) { toast(t('selectOffer'), 'error'); return; }
       const job = savedJobs.find(j => j.id === parseInt(selectedJob));
-      if (job) { jobTitle = job.title; company = job.company; }
+      if (job) { jobTitle = job.title; company = job.company; jobUrl = job.url || ''; jobLocation = job.location || ''; jobExplanation = job.explanation || ''; }
     } else {
-      if (!manualDesc.trim()) { toast('Collez une description', 'error'); return; }
+      if (!manualDesc.trim()) { toast(t('pasteDesc'), 'error'); return; }
       jobDesc = manualDesc; jobTitle = 'Poste décrit manuellement';
     }
     setLoading(true);
     try {
-      const data = await api('/api/letter', { method: 'POST', body: JSON.stringify({ job_title: jobTitle, company, job_description: jobDesc, instruction }) });
+      const data = await api('/api/letter', { method: 'POST', body: JSON.stringify({ job_title: jobTitle, company, job_description: jobDesc, job_url: jobUrl, job_location: jobLocation, job_explanation: jobExplanation, instruction }) });
       setLetter(data.letter);
       setLetterJob({ title: data.job_title, company: data.company });
       await loadStats();
@@ -583,39 +857,39 @@ function LetterPage({ savedJobs, loadStats, toast }) {
     setLoading(false);
   };
 
-  const copyLetter = () => { navigator.clipboard.writeText(letter); toast('Lettre copiée ✓'); };
+  const copyLetter = () => { navigator.clipboard.writeText(letter); toast(t('letterCopied')); };
 
   return (
     <div>
-      <h1 className="page-title">Lettre de motivation</h1>
+      <h1 className="page-title">{t('coverLetterTitle')}</h1>
       <div className="card">
         <div className="toggle-row">
-          <button className={`toggle-btn ${mode==='saved'?'active':''}`} onClick={()=>setMode('saved')}>Offre sauvegardée</button>
-          <button className={`toggle-btn ${mode==='manual'?'active':''}`} onClick={()=>setMode('manual')}>Description manuelle</button>
+          <button className={`toggle-btn ${mode==='saved'?'active':''}`} onClick={()=>setMode('saved')}>{t('savedOffer')}</button>
+          <button className={`toggle-btn ${mode==='manual'?'active':''}`} onClick={()=>setMode('manual')}>{t('manualDesc')}</button>
         </div>
         {mode === 'saved' ? (
           <div>
-            <label className="input-label">Sélectionner une offre sauvegardée</label>
+            <label className="input-label">{t('selectSaved')}</label>
             <select className="input" value={selectedJob} onChange={e => setSelectedJob(e.target.value)}>
-              <option value="">-- Choisir une offre --</option>
+              <option value="">{t('chooseOffer')}</option>
               {savedJobs.map(j => <option key={j.id} value={j.id}>{j.title} — {j.company}</option>)}
             </select>
           </div>
         ) : (
           <div>
-            <label className="input-label">Description du poste</label>
-            <textarea className="textarea" style={{minHeight:150}} value={manualDesc} onChange={e=>setManualDesc(e.target.value)} placeholder="Collez la description de l'offre ici..." />
+            <label className="input-label">{t('jobDescription')}</label>
+            <textarea className="textarea" style={{minHeight:150}} value={manualDesc} onChange={e=>setManualDesc(e.target.value)} placeholder={t('pasteDescription')} />
           </div>
         )}
         <div style={{marginTop:16}}>
-          <label className="input-label">Instruction spécifique (optionnel)</label>
-          <input className="input" value={instruction} onChange={e=>setInstruction(e.target.value)} placeholder="ex: plus courte, insiste sur mon expérience événementielle" />
+          <label className="input-label">{t('specificInstruction')}</label>
+          <input className="input" value={instruction} onChange={e=>setInstruction(e.target.value)} placeholder={t('instructionPlaceholder')} />
         </div>
         <div style={{marginTop:16}}>
-          <button className="btn btn-primary" onClick={generate} disabled={loading}>{loading ? 'Génération...' : 'Générer la lettre'}</button>
+          <button className="btn btn-primary" onClick={generate} disabled={loading}>{loading ? t('generating') : t('generateBtn')}</button>
         </div>
       </div>
-      {loading && <div><div className="spinner"/><div className="loading-text">Génération en cours...</div></div>}
+      {loading && <div><div className="spinner"/><div className="loading-text">{t('generatingText')}</div></div>}
       {letter && !loading && (
         <div className="card">
           <div style={{marginBottom:16}}>
@@ -624,8 +898,8 @@ function LetterPage({ savedJobs, loadStats, toast }) {
           </div>
           <textarea className="textarea" style={{minHeight:400,lineHeight:1.8,whiteSpace:'pre-wrap'}} value={letter} onChange={e => setLetter(e.target.value)} />
           <div style={{display:'flex',gap:12,marginTop:16,justifyContent:'flex-end'}}>
-            <button className="btn btn-outline" onClick={copyLetter}>Copier la lettre</button>
-            <button className="btn btn-primary" onClick={generate}>Régénérer</button>
+            <button className="btn btn-outline" onClick={copyLetter}>{t('copyLetter')}</button>
+            <button className="btn btn-primary" onClick={generate}>{t('regenerate')}</button>
           </div>
         </div>
       )}
@@ -641,7 +915,7 @@ function RecapPage({ stats, savedJobs }) {
 
   if (viewLetter) return (
     <div>
-      <button className="btn btn-outline" onClick={() => setViewLetter(null)} style={{marginBottom:16}}>← Retour</button>
+      <button className="btn btn-outline" onClick={() => setViewLetter(null)} style={{marginBottom:16}}>{t('back')}</button>
       <div className="card">
         <h3 style={{marginBottom:4}}>{viewLetter.job_title}</h3>
         <p style={{color:'var(--text-secondary)',fontSize:13,marginBottom:16}}>{viewLetter.company} · {new Date(viewLetter.created_at).toLocaleDateString('fr-FR')}</p>
@@ -652,32 +926,32 @@ function RecapPage({ stats, savedJobs }) {
 
   return (
     <div>
-      <h1 className="page-title">Récapitulatif</h1>
+      <h1 className="page-title">{t('recapTitle')}</h1>
       <div className="stats-row">
-        <div className="stat-card"><div className="stat-number">{stats.total_found}</div><div className="stat-label">Offres trouvées</div></div>
-        <div className="stat-card"><div className="stat-number">{stats.saved}</div><div className="stat-label">Offres sauvegardées</div></div>
-        <div className="stat-card"><div className="stat-number">{stats.letters}</div><div className="stat-label">Lettres générées</div></div>
+        <div className="stat-card"><div className="stat-number">{stats.total_found}</div><div className="stat-label">{t('jobsFound')}</div></div>
+        <div className="stat-card"><div className="stat-number">{stats.saved}</div><div className="stat-label">{t('jobsSaved')}</div></div>
+        <div className="stat-card"><div className="stat-number">{stats.letters}</div><div className="stat-label">{t('lettersGenerated')}</div></div>
       </div>
       <div className="card">
-        <h3 className="card-title" style={{marginBottom:16}}>Mes dernières lettres</h3>
-        {letters.length === 0 && <p style={{color:'var(--text-secondary)',fontSize:14}}>Aucune lettre générée pour le moment.</p>}
+        <h3 className="card-title" style={{marginBottom:16}}>{t('myLastLetters')}</h3>
+        {letters.length === 0 && <p style={{color:'var(--text-secondary)',fontSize:14}}>{t('noLettersYet')}</p>}
         {letters.slice(0,5).map(l => (
           <div className="recap-item" key={l.id}>
             <div><div className="recap-title">{l.job_title}{l.company && ` — ${l.company}`}</div><div className="recap-date">{l.created_at ? new Date(l.created_at).toLocaleDateString('fr-FR') : ''}</div></div>
-            <button className="btn btn-outline" style={{fontSize:12,padding:'6px 14px'}} onClick={() => setViewLetter(l)}>Revoir</button>
+            <button className="btn btn-outline" style={{fontSize:12,padding:'6px 14px'}} onClick={() => setViewLetter(l)}>{t('review')}</button>
           </div>
         ))}
       </div>
       <div className="card">
-        <h3 className="card-title" style={{marginBottom:16}}>Mes offres sauvegardées</h3>
-        {savedJobs.length === 0 && <p style={{color:'var(--text-secondary)',fontSize:14}}>Aucune offre sauvegardée pour le moment.</p>}
+        <h3 className="card-title" style={{marginBottom:16}}>{t('mySavedOffers')}</h3>
+        {savedJobs.length === 0 && <p style={{color:'var(--text-secondary)',fontSize:14}}>{t('noSavedOffers')}</p>}
         {savedJobs.slice(0,5).map(j => (
           <div className="recap-item" key={j.id}>
             <div style={{display:'flex',alignItems:'center',gap:12}}>
               <div className={`score-badge ${j.score>=7?'score-high':j.score>=4?'score-mid':'score-low'}`} style={{width:36,height:36,fontSize:13}}>{Math.round(j.score)}</div>
               <div><div className="recap-title">{j.title}</div><div className="recap-date">{j.company}</div></div>
             </div>
-            {j.url && j.url !== '#' && <a href={j.url} target="_blank" rel="noopener noreferrer" className="btn btn-outline" style={{fontSize:12,padding:'6px 14px'}}>Voir</a>}
+            {j.url && j.url !== '#' && <a href={j.url} target="_blank" rel="noopener noreferrer" className="btn btn-outline" style={{fontSize:12,padding:'6px 14px'}}>{t('view')}</a>}
           </div>
         ))}
       </div>
@@ -687,7 +961,7 @@ function RecapPage({ stats, savedJobs }) {
 
 /* ---- CHAT ---- */
 function ChatPanel({ onClose }) {
-  const [messages, setMessages] = useState([{ role: 'ai', text: "Bonjour ! Comment puis-je vous aider dans votre recherche d'emploi ?" }]);
+  const [messages, setMessages] = useState([{ role: 'ai', text: t('chatWelcome') }]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef();
@@ -701,20 +975,20 @@ function ChatPanel({ onClose }) {
     try {
       const data = await api('/api/chat', { method: 'POST', body: JSON.stringify({ message: msg }) });
       setMessages(m => [...m, { role: 'ai', text: data.response }]);
-    } catch(e) { setMessages(m => [...m, { role: 'ai', text: "Désolé, une erreur est survenue." }]); }
+    } catch(e) { setMessages(m => [...m, { role: 'ai', text: t('chatError') }]); }
     setLoading(false);
   };
 
   return (
     <div className="chat-panel">
-      <div className="chat-header"><span>Assistant JobHunter</span><button className="chat-close" onClick={onClose}>✕</button></div>
+      <div className="chat-header"><span>{t('chatTitle')}</span><button className="chat-close" onClick={onClose}>✕</button></div>
       <div className="chat-messages">
         {messages.map((m,i) => <div key={i} className={`chat-msg ${m.role}`}>{m.text}</div>)}
         {loading && <div className="chat-msg ai">...</div>}
         <div ref={bottomRef}/>
       </div>
       <div className="chat-input-area">
-        <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&send()} placeholder="Votre message..." />
+        <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&send()} placeholder={t('chatPlaceholder')} />
         <button onClick={send} disabled={loading}><Icon.Send /></button>
       </div>
     </div>

@@ -83,6 +83,9 @@ class Profile(Base):
     cv = Column(Text, default="")
     cover_letter = Column(Text, default="")
     goals = Column(Text, default="")
+    cvs_json = Column(Text, default="[]")
+    cover_letters_json = Column(Text, default="[]")
+    language = Column(String, default="fr")
 
 
 class SavedJob(Base):
@@ -111,6 +114,23 @@ class GeneratedLetter(Base):
 
 
 Base.metadata.create_all(engine)
+
+# --- Migration: add new columns if missing ---
+try:
+    from sqlalchemy import inspect as sa_inspect, text
+    inspector = sa_inspect(engine)
+    existing_cols = [c["name"] for c in inspector.get_columns("profiles")]
+    with engine.connect() as conn:
+        if "cvs_json" not in existing_cols:
+            conn.execute(text("ALTER TABLE profiles ADD COLUMN cvs_json TEXT DEFAULT '[]'"))
+        if "cover_letters_json" not in existing_cols:
+            conn.execute(text("ALTER TABLE profiles ADD COLUMN cover_letters_json TEXT DEFAULT '[]'"))
+        if "language" not in existing_cols:
+            conn.execute(text("ALTER TABLE profiles ADD COLUMN language VARCHAR DEFAULT 'fr'"))
+        conn.commit()
+    logger.info("Migration check done")
+except Exception as e:
+    logger.warning(f"Migration check: {e}")
 
 # --- FastAPI ---
 app = FastAPI(title="JobHunter AI")
@@ -220,6 +240,9 @@ class ProfileData(BaseModel):
     cv: str = ""
     cover_letter: str = ""
     goals: str = ""
+    cvs: list = []
+    cover_letters: list = []
+    language: str = "fr"
 
 
 @app.get("/api/profile")
@@ -229,8 +252,30 @@ def get_profile(request: Request):
     try:
         p = db.query(Profile).filter(Profile.user_id == user.id).first()
         if not p:
-            return {"cv": "", "cover_letter": "", "goals": ""}
-        return {"cv": p.cv or "", "cover_letter": p.cover_letter or "", "goals": p.goals or ""}
+            return {"cv": "", "cover_letter": "", "goals": "", "cvs": [], "cover_letters": [], "language": "fr"}
+        cvs = []
+        cover_letters = []
+        try:
+            cvs = json.loads(p.cvs_json or "[]")
+        except Exception:
+            pass
+        try:
+            cover_letters = json.loads(p.cover_letters_json or "[]")
+        except Exception:
+            pass
+        # Migrate old single cv/cover_letter into arrays if arrays are empty
+        if not cvs and p.cv:
+            cvs = [{"name": "Mon CV", "content": p.cv}]
+        if not cover_letters and p.cover_letter:
+            cover_letters = [{"name": "Ma lettre", "content": p.cover_letter}]
+        return {
+            "cv": p.cv or "",
+            "cover_letter": p.cover_letter or "",
+            "goals": p.goals or "",
+            "cvs": cvs,
+            "cover_letters": cover_letters,
+            "language": p.language or "fr",
+        }
     finally:
         db.close()
 
@@ -241,21 +286,32 @@ def save_profile(data: ProfileData, request: Request):
     db = SessionLocal()
     try:
         p = db.query(Profile).filter(Profile.user_id == user.id).first()
+        # Use first CV/cover_letter for backward compat
+        main_cv = data.cvs[0]["content"] if data.cvs else data.cv
+        main_cl = data.cover_letters[0]["content"] if data.cover_letters else data.cover_letter
         if not p:
-            p = Profile(user_id=user.id, cv=data.cv, cover_letter=data.cover_letter, goals=data.goals)
+            p = Profile(
+                user_id=user.id, cv=main_cv, cover_letter=main_cl, goals=data.goals,
+                cvs_json=json.dumps(data.cvs), cover_letters_json=json.dumps(data.cover_letters),
+                language=data.language,
+            )
             db.add(p)
         else:
-            p.cv = data.cv
-            p.cover_letter = data.cover_letter
+            p.cv = main_cv
+            p.cover_letter = main_cl
             p.goals = data.goals
+            p.cvs_json = json.dumps(data.cvs)
+            p.cover_letters_json = json.dumps(data.cover_letters)
+            p.language = data.language
         db.commit()
         return {"status": "ok"}
     finally:
         db.close()
 
 
-@app.post("/api/profile/upload-cv")
-async def upload_cv(request: Request, file: UploadFile = File(...)):
+@app.post("/api/profile/upload-pdf")
+async def upload_pdf(request: Request, file: UploadFile = File(...)):
+    """Extract text from a PDF file (CV or cover letter). Returns extracted text without saving."""
     user = require_user(request)
 
     if not file.filename.lower().endswith(".pdf"):
@@ -265,7 +321,6 @@ async def upload_cv(request: Request, file: UploadFile = File(...)):
     if len(content) > 10 * 1024 * 1024:
         raise HTTPException(400, "Fichier trop volumineux (max 10 Mo).")
 
-    # Extract text from PDF
     try:
         pdf_text = ""
         with pdfplumber.open(io.BytesIO(content)) as pdf:
@@ -281,50 +336,38 @@ async def upload_cv(request: Request, file: UploadFile = File(...)):
         logger.error(f"PDF extraction error: {e}")
         raise HTTPException(400, "Erreur lors de la lecture du PDF.")
 
-    # AI analysis of CV
+    # AI analysis
     try:
         resp = groq_client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
                 {
                     "role": "user",
-                    "content": f"""Voici le texte extrait d'un CV au format PDF.
-Reformate-le proprement en texte structuré et lisible, en gardant toutes les informations importantes:
-- Informations personnelles (nom, contact)
-- Formation
-- Expériences professionnelles
-- Compétences
-- Langues
-- Autres sections pertinentes
+                    "content": f"""Voici le texte extrait d'un document PDF.
+Reformate-le proprement en texte structuré et lisible, en gardant toutes les informations importantes.
 
-Texte brut du CV:
+Texte brut:
 {pdf_text[:4000]}
 
-Réponds UNIQUEMENT avec le CV reformaté, sans commentaire ni introduction.""",
+Réponds UNIQUEMENT avec le texte reformaté, sans commentaire ni introduction.""",
                 }
             ],
             temperature=0.2,
             max_tokens=2000,
         )
-        formatted_cv = resp.choices[0].message.content.strip()
+        formatted = resp.choices[0].message.content.strip()
     except Exception as e:
-        logger.warning(f"Groq CV analysis error: {e}")
-        formatted_cv = pdf_text.strip()
+        logger.warning(f"Groq PDF analysis error: {e}")
+        formatted = pdf_text.strip()
 
-    # Save to profile
-    db = SessionLocal()
-    try:
-        p = db.query(Profile).filter(Profile.user_id == user.id).first()
-        if not p:
-            p = Profile(user_id=user.id, cv=formatted_cv)
-            db.add(p)
-        else:
-            p.cv = formatted_cv
-        db.commit()
-    finally:
-        db.close()
+    return {"text": formatted, "filename": file.filename, "status": "ok"}
 
-    return {"cv": formatted_cv, "status": "ok"}
+
+# Keep old endpoint for backward compat
+@app.post("/api/profile/upload-cv")
+async def upload_cv(request: Request, file: UploadFile = File(...)):
+    result = await upload_pdf(request, file)
+    return {"cv": result["text"], "status": "ok"}
 
 
 # --- Scraping ---
@@ -708,7 +751,44 @@ class LetterRequest(BaseModel):
     job_title: str = ""
     company: str = ""
     job_description: str = ""
+    job_url: str = ""
+    job_location: str = ""
+    job_explanation: str = ""
     instruction: str = ""
+
+
+def fetch_job_description(url: str) -> str:
+    """Try to fetch the actual job description from the offer URL."""
+    if not url or url == "#":
+        return ""
+    try:
+        resp = requests.get(url, headers=HEADERS, timeout=10)
+        if resp.status_code != 200:
+            return ""
+        soup = BeautifulSoup(resp.content, "lxml")
+        # Remove scripts and styles
+        for tag in soup(["script", "style", "nav", "header", "footer"]):
+            tag.decompose()
+        # Try common job description selectors
+        desc = ""
+        for selector in [
+            "div.description", "div.job-description", "section.description",
+            "div[class*='description']", "div[class*='Description']",
+            "article", "div.content", "main",
+        ]:
+            el = soup.select_one(selector)
+            if el and len(el.get_text(strip=True)) > 100:
+                desc = el.get_text(separator="\n", strip=True)
+                break
+        if not desc:
+            # Fallback: get the main text content
+            body = soup.find("body")
+            if body:
+                desc = body.get_text(separator="\n", strip=True)
+        return desc[:3000]
+    except Exception as e:
+        logger.warning(f"Failed to fetch job description from {url}: {e}")
+        return ""
 
 
 @app.post("/api/letter")
@@ -723,25 +803,65 @@ def generate_letter(req: LetterRequest, request: Request):
     if not profile or not profile.cv:
         raise HTTPException(400, "Veuillez d'abord compléter votre profil avec votre CV.")
 
+    # Build full CV text from all CVs
+    all_cvs_text = profile.cv or ""
+    try:
+        cvs_list = json.loads(profile.cvs_json or "[]")
+        if cvs_list:
+            all_cvs_text = "\n\n---\n\n".join(
+                f"[{cv.get('name', 'CV')}]\n{cv.get('content', '')}" for cv in cvs_list if cv.get("content")
+            )
+    except Exception:
+        pass
+
+    # Build cover letter examples from all cover letters
+    all_cls_text = profile.cover_letter or ""
+    try:
+        cls_list = json.loads(profile.cover_letters_json or "[]")
+        if cls_list:
+            all_cls_text = "\n\n---\n\n".join(
+                f"[{cl.get('name', 'Lettre')}]\n{cl.get('content', '')}" for cl in cls_list if cl.get("content")
+            )
+    except Exception:
+        pass
+
+    # Try to fetch the actual job description from URL if not provided
+    job_desc = req.job_description
+    if not job_desc and req.job_url:
+        logger.info(f"Fetching job description from URL: {req.job_url}")
+        job_desc = fetch_job_description(req.job_url)
+
+    # Build job context
+    job_context = f"Offre d'emploi: {req.job_title} chez {req.company}"
+    if req.job_location:
+        job_context += f" à {req.job_location}"
+    if job_desc:
+        job_context += f"\n\nDescription complète du poste:\n{job_desc[:2500]}"
+    elif req.job_explanation:
+        job_context += f"\n\nRésumé de l'offre: {req.job_explanation}"
+
     prompt = f"""Tu es un expert en rédaction de lettres de motivation en français.
 
+IMPORTANT: Tu dois impérativement utiliser les informations du CV ci-dessous pour personnaliser la lettre.
+Mentionne des expériences, compétences et formations spécifiques du candidat qui correspondent à l'offre.
+
 CV du candidat:
-{profile.cv[:2000]}
+{all_cvs_text[:3000]}
 
 Objectifs du candidat:
 {profile.goals[:500] if profile.goals else "Non précisé"}
 
-{"Voici un exemple de lettre du candidat dont tu dois t'inspirer pour le style:" if profile.cover_letter else ""}
-{profile.cover_letter[:1500] if profile.cover_letter else ""}
+{"IMPORTANT: Voici des exemples de lettres du candidat. Tu DOIS t'inspirer de leur style, ton et structure:" if all_cls_text else ""}
+{all_cls_text[:2000] if all_cls_text else ""}
 
-Offre d'emploi: {req.job_title} chez {req.company}
-{f"Description du poste: {req.job_description[:1000]}" if req.job_description else ""}
+{job_context}
 {f"Instruction spécifique: {req.instruction}" if req.instruction else ""}
 
 Rédige une lettre de motivation de ~280 mots, en français, en 3 paragraphes.
 Ton professionnel mais humain, direct et confiant.
 Ne commence JAMAIS par "Je me permets de vous contacter".
-{"Inspire-toi du style de la lettre exemple fournie." if profile.cover_letter else ""}"""
+Fais des liens CONCRETS entre les expériences du CV et les exigences du poste.
+{"Inspire-toi FORTEMENT du style et du ton des lettres exemples fournies." if all_cls_text else ""}"""
 
     try:
         resp = groq_client.chat.completions.create(
