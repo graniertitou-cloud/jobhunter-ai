@@ -182,6 +182,31 @@ html[data-lang="en"] .sidebar-logo{background:linear-gradient(135deg,#e84393,#fd
 html[data-lang="en"] .login-page{background:linear-gradient(135deg,#2d1b35 0%,#3d1f47 100%)}
 html[data-lang="en"] .google-btn:hover{border-color:#e84393;box-shadow:0 2px 8px rgba(232,67,147,0.15)}
 html[data-lang="en"] .stat-number{color:#e84393}
+/* ---- RESPONSIVE ---- */
+@media(max-width:768px){
+  .sidebar{position:fixed;left:-260px;width:260px;transition:left .3s ease;z-index:200}
+  .sidebar.open{left:0}
+  .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:199}
+  .sidebar-overlay.open{display:block}
+  .main{margin-left:0;padding:16px}
+  .mobile-header{display:flex;align-items:center;gap:12px;padding:12px 0;margin-bottom:8px}
+  .mobile-menu-btn{background:none;border:none;font-size:24px;cursor:pointer;color:var(--text-primary);padding:4px}
+  .page-title{font-size:20px;margin-bottom:16px}
+  .stats-row{grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
+  .stat-card{padding:12px 8px}
+  .stat-number{font-size:24px}
+  .stat-label{font-size:11px}
+  .card{padding:16px;margin-bottom:12px}
+  .job-card{flex-direction:column;gap:10px;padding:14px}
+  .toggle-row{flex-wrap:wrap}
+  .people-table{font-size:12px}
+  .people-table th,.people-table td{padding:8px 6px}
+  .quick-actions{grid-template-columns:1fr !important}
+}
+@media(min-width:769px){
+  .mobile-header{display:none}
+  .sidebar-overlay{display:none !important}
+}
 </style>
 </head>
 <body>
@@ -233,6 +258,7 @@ const translations = {
     selectSaved: 'Sélectionner une offre sauvegardée', chooseOffer: '-- Choisir une offre --',
     jobDescription: 'Description du poste', pasteDescription: 'Collez la description de l\'offre ici...',
     specificInstruction: 'Instruction spécifique (optionnel)', instructionPlaceholder: 'ex: plus courte, insiste sur mon expérience événementielle',
+    letterLangLabel: 'Langue de la lettre',
     generateBtn: 'Générer la lettre', generating: 'Génération...', generatingText: 'Génération en cours...',
     copyLetter: 'Copier la lettre', regenerate: 'Régénérer', letterCopied: 'Lettre copiée ✓',
     selectOffer: 'Sélectionnez une offre', pasteDesc: 'Collez une description',
@@ -293,6 +319,7 @@ const translations = {
     selectSaved: 'Select a saved offer', chooseOffer: '-- Choose an offer --',
     jobDescription: 'Job description', pasteDescription: 'Paste the job description here...',
     specificInstruction: 'Specific instruction (optional)', instructionPlaceholder: 'e.g., shorter, emphasize my event experience',
+    letterLangLabel: 'Letter language',
     generateBtn: 'Generate letter', generating: 'Generating...', generatingText: 'Generating...',
     copyLetter: 'Copy letter', regenerate: 'Regenerate', letterCopied: 'Letter copied ✓',
     selectOffer: 'Select an offer', pasteDesc: 'Paste a description',
@@ -350,6 +377,7 @@ const translations = {
     selectSaved: 'Séléctioné une offre sovgardé', chooseOffer: '-- Choisire une offre --',
     jobDescription: 'Descripcion du poste', pasteDescription: 'Collé la descripcion de l\'offre ici...',
     specificInstruction: 'Instruccion spécifike (opcionel)', instructionPlaceholder: 'ex: plus courte, insiste sur mon éxpérience événemencièle',
+    letterLangLabel: 'Langeu de la laitre',
     generateBtn: 'Généré la laitre', generating: 'Généracion...', generatingText: 'Généracion en cour...',
     copyLetter: 'Copié la laitre', regenerate: 'Régénéré', letterCopied: 'Laitre copié ✓',
     selectOffer: 'Séléctioné une offre', pasteDesc: 'Collé une descripcion',
@@ -486,6 +514,7 @@ function App() {
   const [page, setPage] = useState('dashboard');
   const [toasts, setToasts] = useState([]);
   const [chatOpen, setChatOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [profile, setProfile] = useState({ cv: '', cover_letter: '', goals: '', cvs: [], cover_letters: [], language: 'fr' });
   const [stats, setStats] = useState({ total_found: 0, saved: 0, letters: 0 });
   const [savedJobs, setSavedJobs] = useState([]);
@@ -532,11 +561,12 @@ function App() {
 
   return (
     <div className="app">
-      <div className="sidebar">
+      <div className={`sidebar-overlay ${menuOpen?'open':''}`} onClick={() => setMenuOpen(false)} />
+      <div className={`sidebar ${menuOpen?'open':''}`}>
         <div className="sidebar-logo">JobHunter AI</div>
         <nav className="sidebar-nav">
           {navItems.map(({ key, icon: Ic }) => (
-            <div key={key} className={`nav-item ${page===key?'active':''}`} onClick={() => { setPage(key); if(key==='recap'||key==='dashboard'){loadStats();loadSaved();} }}>
+            <div key={key} className={`nav-item ${page===key?'active':''}`} onClick={() => { setPage(key); setMenuOpen(false); if(key==='recap'||key==='dashboard'){loadStats();loadSaved();} }}>
               <Ic />{t(key)}
             </div>
           ))}
@@ -549,6 +579,10 @@ function App() {
         </div>
       </div>
       <div className="main">
+        <div className="mobile-header">
+          <button className="mobile-menu-btn" onClick={() => setMenuOpen(true)}>&#9776;</button>
+          <span style={{fontWeight:600,fontSize:16}}>JobHunter AI</span>
+        </div>
         {page === 'dashboard' && <DashboardPage stats={stats} profileComplete={profileComplete} setPage={setPage} user={user} />}
         {page === 'profile' && <ProfilePage profile={profile} setProfile={setProfile} loadProfile={loadProfile} loadStats={loadStats} toast={toast} onLangChange={onLangChange} />}
         {page === 'search' && <SearchPage savedJobs={savedJobs} loadSaved={loadSaved} loadStats={loadStats} toast={toast} setPage={setPage} setStats={setStats} />}
@@ -878,6 +912,7 @@ function LetterPage({ savedJobs, loadStats, toast }) {
   const [selectedJob, setSelectedJob] = useState('');
   const [manualDesc, setManualDesc] = useState('');
   const [instruction, setInstruction] = useState('');
+  const [letterLang, setLetterLang] = useState('fr');
   const [loading, setLoading] = useState(false);
   const [letter, setLetter] = useState('');
   const [letterJob, setLetterJob] = useState({ title: '', company: '' });
@@ -894,7 +929,7 @@ function LetterPage({ savedJobs, loadStats, toast }) {
     }
     setLoading(true);
     try {
-      const data = await api('/api/letter', { method: 'POST', body: JSON.stringify({ job_title: jobTitle, company, job_description: jobDesc, job_url: jobUrl, job_location: jobLocation, job_explanation: jobExplanation, instruction }) });
+      const data = await api('/api/letter', { method: 'POST', body: JSON.stringify({ job_title: jobTitle, company, job_description: jobDesc, job_url: jobUrl, job_location: jobLocation, job_explanation: jobExplanation, instruction, letter_language: letterLang }) });
       setLetter(data.letter);
       setLetterJob({ title: data.job_title, company: data.company });
       await loadStats();
@@ -929,6 +964,13 @@ function LetterPage({ savedJobs, loadStats, toast }) {
         <div style={{marginTop:16}}>
           <label className="input-label">{t('specificInstruction')}</label>
           <input className="input" value={instruction} onChange={e=>setInstruction(e.target.value)} placeholder={t('instructionPlaceholder')} />
+        </div>
+        <div style={{marginTop:16}}>
+          <label className="input-label">{t('letterLangLabel')}</label>
+          <div style={{display:'flex',gap:8}}>
+            <button className={`btn ${letterLang==='fr'?'btn-primary':'btn-outline'}`} onClick={()=>setLetterLang('fr')} style={{padding:'8px 16px',fontSize:13}}>Français</button>
+            <button className={`btn ${letterLang==='en'?'btn-primary':'btn-outline'}`} onClick={()=>setLetterLang('en')} style={{padding:'8px 16px',fontSize:13}}>English</button>
+          </div>
         </div>
         <div style={{marginTop:16}}>
           <button className="btn btn-primary" onClick={generate} disabled={loading}>{loading ? t('generating') : t('generateBtn')}</button>

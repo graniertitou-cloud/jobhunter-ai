@@ -766,6 +766,7 @@ class LetterRequest(BaseModel):
     job_location: str = ""
     job_explanation: str = ""
     instruction: str = ""
+    letter_language: str = "fr"  # "fr" or "en"
 
 
 def fetch_job_description(url: str) -> str:
@@ -851,7 +852,19 @@ def generate_letter(req: LetterRequest, request: Request):
     elif req.job_explanation:
         job_context += f"\n\nRésumé de l'offre: {req.job_explanation}"
 
-    prompt = f"""Tu es un expert en rédaction de lettres de motivation en français.
+    lang = req.letter_language or "fr"
+    if lang == "en":
+        lang_instruction = "Write the cover letter entirely in ENGLISH. Do NOT write in French."
+        lang_label = "in English"
+        opening_ban = 'Never start with "I am writing to express my interest".'
+    else:
+        lang_instruction = "Rédige la lettre entièrement en FRANÇAIS."
+        lang_label = "en français"
+        opening_ban = 'Ne commence JAMAIS par "Je me permets de vous contacter".'
+
+    prompt = f"""Tu es un expert en rédaction de lettres de motivation.
+
+{lang_instruction}
 
 IMPORTANT: Tu dois impérativement utiliser les informations du CV ci-dessous pour personnaliser la lettre.
 Mentionne des expériences, compétences et formations spécifiques du candidat qui correspondent à l'offre.
@@ -868,9 +881,9 @@ Objectifs du candidat:
 {job_context}
 {f"Instruction spécifique: {req.instruction}" if req.instruction else ""}
 
-Rédige une lettre de motivation de ~280 mots, en français, en 3 paragraphes.
+Rédige une lettre de motivation de ~280 mots, {lang_label}, en 3 paragraphes.
 Ton professionnel mais humain, direct et confiant.
-Ne commence JAMAIS par "Je me permets de vous contacter".
+{opening_ban}
 Fais des liens CONCRETS entre les expériences du CV et les exigences du poste.
 {"Inspire-toi FORTEMENT du style et du ton des lettres exemples fournies." if all_cls_text else ""}"""
 
