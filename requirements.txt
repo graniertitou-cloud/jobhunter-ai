@@ -10,3 +10,4 @@ pdfplumber
 python-multipart
 psycopg2-binary
 ddgs
+apscheduler

@@ -86,6 +86,8 @@ class Profile(Base):
     cvs_json = Column(Text, default="[]")
     cover_letters_json = Column(Text, default="[]")
     language = Column(String, default="fr")
+    alert_keywords = Column(Text, default="")
+    alert_location = Column(String, default="")
 
 
 class SavedJob(Base):
@@ -113,6 +115,32 @@ class GeneratedLetter(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class Alert(Base):
+    __tablename__ = "alerts"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    job_title = Column(String, default="")
+    company = Column(String, default="")
+    url = Column(String, default="")
+    score = Column(Float, default=0)
+    explanation = Column(Text, default="")
+    seen = Column(Integer, default=0)  # 0=unseen, 1=seen (Integer for SQLite compat)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class Application(Base):
+    __tablename__ = "applications"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    job_title = Column(String, default="")
+    company = Column(String, default="")
+    url = Column(String, default="")
+    status = Column(String, default="sent")  # sent, followed_up, interview, rejected, waiting
+    notes = Column(Text, default="")
+    applied_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+
 class PeopleSearchHistory(Base):
     __tablename__ = "people_search_history"
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -138,6 +166,10 @@ try:
             conn.execute(text("ALTER TABLE profiles ADD COLUMN cover_letters_json TEXT DEFAULT '[]'"))
         if "language" not in existing_cols:
             conn.execute(text("ALTER TABLE profiles ADD COLUMN language VARCHAR DEFAULT 'fr'"))
+        if "alert_keywords" not in existing_cols:
+            conn.execute(text("ALTER TABLE profiles ADD COLUMN alert_keywords TEXT DEFAULT ''"))
+        if "alert_location" not in existing_cols:
+            conn.execute(text("ALTER TABLE profiles ADD COLUMN alert_location VARCHAR DEFAULT ''"))
         conn.commit()
     logger.info("Migration check done")
 except Exception as e:
@@ -148,6 +180,89 @@ app = FastAPI(title="JobHunter AI")
 os.makedirs("static", exist_ok=True)
 os.makedirs("uploads", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# --- APScheduler for alerts ---
+from apscheduler.schedulers.background import BackgroundScheduler
+
+_alert_scheduler = BackgroundScheduler()
+
+
+def check_alerts():
+    """Background job: for each user with alert_keywords, scrape and create alerts for high-score jobs."""
+    db = SessionLocal()
+    try:
+        profiles = db.query(Profile).filter(Profile.alert_keywords != "", Profile.alert_keywords.isnot(None)).all()
+        for prof in profiles:
+            keywords = (prof.alert_keywords or "").strip()
+            location = (prof.alert_location or "France").strip()
+            if not keywords:
+                continue
+            profile_dict = {
+                "cv": prof.cv or "",
+                "cover_letter": prof.cover_letter or "",
+                "goals": prof.goals or "",
+            }
+            all_jobs = []
+            try:
+                all_jobs.extend(scrape_linkedin(keywords, location))
+            except Exception:
+                pass
+            try:
+                all_jobs.extend(scrape_france_travail(keywords, location))
+            except Exception:
+                pass
+            all_jobs = deduplicate(all_jobs)
+            if not all_jobs:
+                continue
+            all_jobs = score_jobs_with_groq(all_jobs, profile_dict)
+            # Get existing alert URLs and saved job URLs to avoid duplicates
+            existing_alert_urls = {a.url for a in db.query(Alert).filter(Alert.user_id == prof.user_id).all() if a.url}
+            existing_saved_urls = {s.url for s in db.query(SavedJob).filter(SavedJob.user_id == prof.user_id).all() if s.url}
+            existing_urls = existing_alert_urls | existing_saved_urls
+            for j in all_jobs:
+                if j.get("score", 0) >= 8:
+                    job_url = j.get("url", "")
+                    if job_url and job_url != "#" and job_url in existing_urls:
+                        continue
+                    # Also check by title+company to catch duplicates without URL
+                    dup = db.query(Alert).filter(
+                        Alert.user_id == prof.user_id,
+                        Alert.job_title == j.get("title", ""),
+                        Alert.company == j.get("company", ""),
+                    ).first()
+                    if dup:
+                        continue
+                    alert = Alert(
+                        user_id=prof.user_id,
+                        job_title=j.get("title", ""),
+                        company=j.get("company", ""),
+                        url=job_url,
+                        score=j.get("score", 0),
+                        explanation=j.get("explanation", ""),
+                    )
+                    db.add(alert)
+            db.commit()
+            logger.info(f"Alert check done for user {prof.user_id}")
+    except Exception as e:
+        logger.warning(f"Alert scheduler error: {e}")
+    finally:
+        db.close()
+
+
+_alert_scheduler.add_job(check_alerts, "interval", hours=24, id="check_alerts", replace_existing=True)
+
+
+@app.on_event("startup")
+def start_scheduler():
+    if not _alert_scheduler.running:
+        _alert_scheduler.start()
+        logger.info("Alert scheduler started (runs every 24h)")
+
+
+@app.on_event("shutdown")
+def stop_scheduler():
+    if _alert_scheduler.running:
+        _alert_scheduler.shutdown(wait=False)
 
 
 def get_current_user(request: Request) -> Optional[User]:
@@ -263,7 +378,11 @@ def get_profile(request: Request):
     try:
         p = db.query(Profile).filter(Profile.user_id == user.id).first()
         if not p:
-            return {"cv": "", "cover_letter": "", "goals": "", "cvs": [], "cover_letters": [], "language": "fr"}
+            return {
+                "cv": "", "cover_letter": "", "goals": "", "cvs": [], "cover_letters": [],
+                "language": "fr", "alert_keywords": "", "alert_location": "",
+                "completion_score": 0, "completion_message": "Commencez par ajouter votre CV pour personnaliser votre experience.",
+            }
         cvs = []
         cover_letters = []
         try:
@@ -279,6 +398,35 @@ def get_profile(request: Request):
             cvs = [{"name": "Mon CV", "content": p.cv}]
         if not cover_letters and p.cover_letter:
             cover_letters = [{"name": "Ma lettre", "content": p.cover_letter}]
+
+        # Calculate completion score
+        score = 0
+        has_cv = bool(p.cv and p.cv.strip())
+        has_cl = bool(p.cover_letter and p.cover_letter.strip())
+        has_goals = bool(p.goals and p.goals.strip())
+        has_application = db.query(Application).filter(Application.user_id == user.id).first() is not None
+        has_saved = db.query(SavedJob).filter(SavedJob.user_id == user.id).first() is not None
+
+        if has_cv:
+            score += 30
+        if has_cl:
+            score += 30
+        if has_goals:
+            score += 20
+        if has_application:
+            score += 10
+        if has_saved:
+            score += 10
+
+        if score >= 90:
+            completion_msg = "Excellent ! Votre profil est complet. Vous etes pret pour decrocher le poste ideal !"
+        elif score >= 60:
+            completion_msg = "Bon progres ! Ajoutez encore quelques elements pour optimiser vos chances."
+        elif score >= 30:
+            completion_msg = "Bon debut ! Completez votre profil pour obtenir de meilleurs resultats."
+        else:
+            completion_msg = "Commencez par ajouter votre CV pour personnaliser votre experience."
+
         return {
             "cv": p.cv or "",
             "cover_letter": p.cover_letter or "",
@@ -286,6 +434,10 @@ def get_profile(request: Request):
             "cvs": cvs,
             "cover_letters": cover_letters,
             "language": p.language or "fr",
+            "alert_keywords": getattr(p, "alert_keywords", "") or "",
+            "alert_location": getattr(p, "alert_location", "") or "",
+            "completion_score": score,
+            "completion_message": completion_msg,
         }
     finally:
         db.close()
@@ -395,6 +547,62 @@ HEADERS = {
     "Upgrade-Insecure-Requests": "1",
 }
 
+_USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 14.4; rv:125.0) Gecko/20100101 Firefox/125.0",
+    "Mozilla/5.0 (X11; Linux x86_64; rv:125.0) Gecko/20100101 Firefox/125.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36 Edg/123.0.0.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+]
+
+
+def get_random_headers() -> dict:
+    """Return headers with a random User-Agent and realistic browser headers."""
+    return {
+        "User-Agent": random.choice(_USER_AGENTS),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+        "Accept-Language": random.choice([
+            "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
+            "fr-FR,fr;q=0.9,en;q=0.8",
+            "en-US,en;q=0.9,fr-FR;q=0.8,fr;q=0.7",
+        ]),
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
+        "Referer": random.choice([
+            "https://www.google.com/",
+            "https://www.google.fr/",
+            "https://www.bing.com/",
+        ]),
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "cross-site",
+        "Sec-Fetch-User": "?1",
+        "Upgrade-Insecure-Requests": "1",
+        "Cache-Control": "max-age=0",
+    }
+
+
+def safe_request(url: str, method: str = "get", **kwargs) -> Optional[requests.Response]:
+    """Make an HTTP request with random headers, retry once on 429/403."""
+    kwargs.setdefault("headers", get_random_headers())
+    kwargs.setdefault("timeout", 12)
+    try:
+        resp = getattr(requests, method)(url, **kwargs)
+        if resp.status_code in (429, 403):
+            logger.info(f"Got {resp.status_code} for {url}, waiting 30s and retrying...")
+            time.sleep(30)
+            kwargs["headers"] = get_random_headers()
+            resp = getattr(requests, method)(url, **kwargs)
+        return resp
+    except Exception as e:
+        logger.warning(f"safe_request error for {url}: {e}")
+        return None
+
 
 def detect_contract_type(text: str) -> str:
     """Detect contract type from job title or description text."""
@@ -416,8 +624,8 @@ def scrape_linkedin(keywords: str, location: str) -> list[dict]:
     jobs = []
     try:
         url = f"https://www.linkedin.com/jobs/search?keywords={quote(keywords)}&location={quote(location)}&f_TPR=r604800"
-        resp = requests.get(url, headers=HEADERS, timeout=10)
-        if resp.status_code != 200:
+        resp = safe_request(url)
+        if resp is None or resp.status_code != 200:
             return jobs
         soup = BeautifulSoup(resp.content, "lxml")
         cards = soup.find_all("div", class_="base-card")
@@ -535,12 +743,12 @@ def scrape_wttj(keywords: str, location: str) -> list[dict]:
 
 
 def scrape_france_travail(keywords: str, location: str) -> list[dict]:
-    """Scrape France Travail (ex-Pôle Emploi) — fiable, 20+ résultats."""
+    """Scrape France Travail (ex-Pole Emploi) --- fiable, 20+ resultats."""
     jobs = []
     try:
         url = f"https://candidat.francetravail.fr/offres/recherche?motsCles={quote(keywords)}&offresPartenaires=true"
-        resp = requests.get(url, headers=HEADERS, timeout=10)
-        if resp.status_code != 200:
+        resp = safe_request(url)
+        if resp is None or resp.status_code != 200:
             return jobs
         soup = BeautifulSoup(resp.content, "lxml")
         for li in soup.select("li.result")[:20]:
@@ -618,9 +826,25 @@ def score_jobs_with_groq(jobs: list[dict], profile: dict) -> list[dict]:
     batches = [jobs[i:i + 8] for i in range(0, len(jobs), 8)]
     scored = []
     for batch in batches:
-        job_list_text = "\n".join(
-            [f"- {j['title']} chez {j['company']} à {j['location']}" for j in batch]
-        )
+        # Try to fetch full descriptions for jobs with valid URLs
+        job_descriptions = {}
+        for idx, j in enumerate(batch):
+            job_url = j.get("url", "")
+            if job_url and job_url != "#":
+                try:
+                    desc = fetch_job_description(job_url)
+                    if desc:
+                        job_descriptions[idx] = desc
+                except Exception:
+                    pass
+
+        job_lines = []
+        for idx, j in enumerate(batch):
+            line = f"- {j['title']} chez {j['company']} à {j['location']}"
+            if idx in job_descriptions:
+                line += f"\n  Description: {job_descriptions[idx][:600]}"
+            job_lines.append(line)
+        job_list_text = "\n".join(job_lines)
         prompt = f"""Tu es un conseiller en emploi. Voici le profil du candidat:
 CV: {cv[:1500]}
 Objectifs: {goals[:500]}
@@ -681,6 +905,11 @@ def search_jobs(req: SearchRequest, request: Request):
             "cover_letter": profile.cover_letter if profile else "",
             "goals": profile.goals if profile else "",
         }
+        # Save search keywords for alert system
+        if profile and req.keywords:
+            profile.alert_keywords = req.keywords
+            profile.alert_location = req.location or ""
+            db.commit()
     finally:
         db.close()
 
@@ -934,7 +1163,31 @@ def get_stats(request: Request):
     try:
         saved_count = db.query(SavedJob).filter(SavedJob.user_id == user.id).count()
         letters_count = db.query(GeneratedLetter).filter(GeneratedLetter.user_id == user.id).count()
-        return {"total_found": 0, "saved": saved_count, "letters": letters_count}
+
+        # Applications by status
+        applications = db.query(Application).filter(Application.user_id == user.id).all()
+        status_counts = {}
+        for a in applications:
+            status_counts[a.status] = status_counts.get(a.status, 0) + 1
+
+        # Unseen alerts
+        unseen_count = db.query(Alert).filter(Alert.user_id == user.id, Alert.seen == 0).count()
+        recent_alerts = db.query(Alert).filter(
+            Alert.user_id == user.id, Alert.seen == 0
+        ).order_by(Alert.created_at.desc()).limit(3).all()
+        recent_alerts_data = [
+            {"id": a.id, "job_title": a.job_title, "company": a.company, "score": a.score}
+            for a in recent_alerts
+        ]
+
+        return {
+            "total_found": 0,
+            "saved": saved_count,
+            "letters": letters_count,
+            "applications_by_status": status_counts,
+            "unseen_alerts": unseen_count,
+            "recent_alerts": recent_alerts_data,
+        }
     finally:
         db.close()
 
@@ -1241,5 +1494,154 @@ def delete_people_history(entry_id: int, request: Request):
             db.delete(entry)
             db.commit()
         return {"ok": True}
+    finally:
+        db.close()
+
+
+# --- Alerts ---
+@app.get("/api/alerts")
+def get_alerts(request: Request):
+    user = require_user(request)
+    db = SessionLocal()
+    try:
+        alerts = db.query(Alert).filter(Alert.user_id == user.id).order_by(Alert.created_at.desc()).limit(50).all()
+        return [
+            {
+                "id": a.id,
+                "job_title": a.job_title,
+                "company": a.company,
+                "url": a.url,
+                "score": a.score,
+                "explanation": a.explanation,
+                "seen": a.seen,
+                "created_at": a.created_at.isoformat() if a.created_at else "",
+            }
+            for a in alerts
+        ]
+    finally:
+        db.close()
+
+
+@app.post("/api/alerts/seen/{alert_id}")
+def mark_alert_seen(alert_id: int, request: Request):
+    user = require_user(request)
+    db = SessionLocal()
+    try:
+        alert = db.query(Alert).filter(Alert.id == alert_id, Alert.user_id == user.id).first()
+        if not alert:
+            raise HTTPException(404, "Alerte non trouvee")
+        alert.seen = 1
+        db.commit()
+        return {"status": "ok"}
+    finally:
+        db.close()
+
+
+# --- Application Tracker ---
+class ApplicationRequest(BaseModel):
+    job_title: str = ""
+    company: str = ""
+    url: str = ""
+    status: str = "sent"
+    notes: str = ""
+
+
+class ApplicationUpdate(BaseModel):
+    status: str = ""
+    notes: str = ""
+
+
+@app.post("/api/applications")
+def create_application(req: ApplicationRequest, request: Request):
+    user = require_user(request)
+    db = SessionLocal()
+    try:
+        app_entry = Application(
+            user_id=user.id,
+            job_title=req.job_title,
+            company=req.company,
+            url=req.url,
+            status=req.status or "sent",
+            notes=req.notes,
+        )
+        db.add(app_entry)
+        db.commit()
+        db.refresh(app_entry)
+        return {
+            "id": app_entry.id,
+            "job_title": app_entry.job_title,
+            "company": app_entry.company,
+            "url": app_entry.url,
+            "status": app_entry.status,
+            "notes": app_entry.notes,
+            "applied_at": app_entry.applied_at.isoformat() if app_entry.applied_at else "",
+            "updated_at": app_entry.updated_at.isoformat() if app_entry.updated_at else "",
+        }
+    finally:
+        db.close()
+
+
+@app.get("/api/applications")
+def list_applications(request: Request):
+    user = require_user(request)
+    db = SessionLocal()
+    try:
+        apps = db.query(Application).filter(Application.user_id == user.id).order_by(Application.applied_at.desc()).all()
+        return [
+            {
+                "id": a.id,
+                "job_title": a.job_title,
+                "company": a.company,
+                "url": a.url,
+                "status": a.status,
+                "notes": a.notes,
+                "applied_at": a.applied_at.isoformat() if a.applied_at else "",
+                "updated_at": a.updated_at.isoformat() if a.updated_at else "",
+            }
+            for a in apps
+        ]
+    finally:
+        db.close()
+
+
+@app.patch("/api/applications/{app_id}")
+def update_application(app_id: int, req: ApplicationUpdate, request: Request):
+    user = require_user(request)
+    db = SessionLocal()
+    try:
+        app_entry = db.query(Application).filter(Application.id == app_id, Application.user_id == user.id).first()
+        if not app_entry:
+            raise HTTPException(404, "Candidature non trouvee")
+        if req.status:
+            app_entry.status = req.status
+        if req.notes is not None and req.notes != "":
+            app_entry.notes = req.notes
+        app_entry.updated_at = datetime.utcnow()
+        db.commit()
+        return {
+            "id": app_entry.id,
+            "job_title": app_entry.job_title,
+            "company": app_entry.company,
+            "url": app_entry.url,
+            "status": app_entry.status,
+            "notes": app_entry.notes,
+            "applied_at": app_entry.applied_at.isoformat() if app_entry.applied_at else "",
+            "updated_at": app_entry.updated_at.isoformat() if app_entry.updated_at else "",
+        }
+    finally:
+        db.close()
+
+
+@app.delete("/api/applications/{app_id}")
+def delete_application(app_id: int, request: Request):
+    user = require_user(request)
+    db = SessionLocal()
+    try:
+        app_entry = db.query(Application).filter(Application.id == app_id, Application.user_id == user.id).first()
+        if not app_entry:
+            raise HTTPException(404, "Candidature non trouvee")
+        db.delete(app_entry)
+        db.commit()
+        return {"status": "deleted"}
     finally:
         db.close()

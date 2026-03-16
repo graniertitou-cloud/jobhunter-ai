@@ -162,6 +162,29 @@ select.input{appearance:none;background:url("data:image/svg+xml,%3Csvg xmlns='ht
 .people-table a:hover{text-decoration:underline}
 .people-name{font-weight:600;color:var(--text-primary)}
 .people-title{color:var(--text-secondary);font-size:12px}
+/* Kanban board */
+.kanban-board{display:flex;gap:16px;overflow-x:auto;padding-bottom:8px}
+.kanban-column{flex:1;min-width:200px;background:var(--main-bg);border-radius:var(--radius-card);padding:12px}
+.kanban-header{font-size:14px;font-weight:600;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between}
+.kanban-header .count-badge{background:var(--accent);color:#fff;font-size:11px;padding:2px 8px;border-radius:12px;font-weight:600}
+.kanban-card{background:var(--card-bg);box-shadow:var(--shadow);padding:14px;margin-bottom:10px;border-radius:var(--radius-btn);transition:box-shadow .2s}
+.kanban-card:hover{box-shadow:0 4px 16px rgba(0,0,0,0.1)}
+/* Alert badge */
+.alert-badge{position:absolute;top:-5px;right:-5px;width:18px;height:18px;border-radius:50%;background:var(--danger);color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1}
+/* Status pill */
+.status-pill{display:inline-block;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:500}
+.status-sent{background:#dbeafe;color:#1e40af}
+.status-followed_up{background:#fef3c7;color:#92400e}
+.status-interview{background:#d1fae5;color:#065f46}
+.status-rejected{background:#fee2e2;color:#991b1b}
+.status-waiting{background:#e2e8f0;color:#475569}
+/* Completion bar */
+.completion-bar{height:10px;background:var(--border);border-radius:5px;overflow:hidden;margin-bottom:6px}
+.completion-fill{height:100%;border-radius:5px;transition:width .4s ease}
+.completion-low{background:var(--danger)}
+.completion-mid{background:var(--warning)}
+.completion-high{background:var(--accent)}
+.completion-full{background:var(--success)}
 /* Pink/Girly theme for English */
 html[data-lang="en"]{
 --sidebar-bg:#2d1b35;--accent:#e84393;--success:#fd79a8;--warning:#fdcb6e;
@@ -202,6 +225,8 @@ html[data-lang="en"] .stat-number{color:#e84393}
   .people-table{font-size:12px}
   .people-table th,.people-table td{padding:8px 6px}
   .quick-actions{grid-template-columns:1fr !important}
+  .kanban-board{flex-direction:column}
+  .kanban-column{min-width:unset}
 }
 @media(min-width:769px){
   .mobile-header{display:none}
@@ -282,6 +307,25 @@ const translations = {
     humanView: 'Voir le profil',
     humanHistory: 'Historique des recherches', humanHistoryEmpty: 'Aucune recherche précédente',
     humanReload: 'Recharger', humanDelete: 'Supprimer', humanAgo: 'il y a',
+    // Alerts
+    alerts: 'Alertes', alertsTitle: 'Alertes emploi', alertsEmpty: 'Aucune alerte pour le moment.',
+    alertsSeeOffer: 'Voir l\'offre', alertsGenerateLetter: 'Générer une lettre', alertsMarkSeen: 'Marquer comme vu',
+    // Tracker
+    tracker: 'Suivi', trackerTitle: 'Suivi des candidatures', trackerEmpty: 'Aucune candidature suivie.',
+    trackerAdd: 'Ajouter',
+    // Statuses
+    statusSent: 'Candidature envoyée', statusFollowedUp: 'Relance faite', statusInterview: 'Entretien obtenu',
+    statusRejected: 'Refus', statusWaiting: 'En attente',
+    // Application
+    applicationNotes: 'Notes', applicationDelete: 'Supprimer', applicationSaved: 'Candidature ajoutée au suivi !',
+    // Dashboard extras
+    dashboardApplications: 'Mes candidatures', dashboardAlerts: 'Dernières alertes',
+    dashboardQuickSearch: 'Recherche rapide', dashboardSearchPlaceholder: 'ex: développeur fullstack Paris',
+    // Completion
+    completionLow: 'Profil très incomplet', completionMid: 'Profil en cours de complétion',
+    completionHigh: 'Profil presque complet', completionFull: 'Profil complet !',
+    // Mark as sent
+    markAsSent: 'Marquer comme candidature envoyée',
   },
   en: {
     dashboard: 'Dashboard', profile: 'Profile', search: 'Search', letter: 'Letter', recap: 'Summary',
@@ -340,6 +384,25 @@ const translations = {
     humanView: 'View profile',
     humanHistory: 'Search History', humanHistoryEmpty: 'No previous searches',
     humanReload: 'Reload', humanDelete: 'Delete', humanAgo: 'ago',
+    // Alerts
+    alerts: 'Alerts', alertsTitle: 'Job Alerts', alertsEmpty: 'No alerts yet.',
+    alertsSeeOffer: 'View offer', alertsGenerateLetter: 'Generate letter', alertsMarkSeen: 'Mark as seen',
+    // Tracker
+    tracker: 'Tracker', trackerTitle: 'Application Tracker', trackerEmpty: 'No tracked applications.',
+    trackerAdd: 'Add',
+    // Statuses
+    statusSent: 'Sent', statusFollowedUp: 'Followed up', statusInterview: 'Interview',
+    statusRejected: 'Rejected', statusWaiting: 'Waiting',
+    // Application
+    applicationNotes: 'Notes', applicationDelete: 'Delete', applicationSaved: 'Application added to tracker!',
+    // Dashboard extras
+    dashboardApplications: 'My applications', dashboardAlerts: 'Recent alerts',
+    dashboardQuickSearch: 'Quick search', dashboardSearchPlaceholder: 'e.g., fullstack developer Paris',
+    // Completion
+    completionLow: 'Profile very incomplete', completionMid: 'Profile partially complete',
+    completionHigh: 'Profile almost complete', completionFull: 'Profile complete!',
+    // Mark as sent
+    markAsSent: 'Mark as application sent',
   },
   titou: {
     dashboard: 'Dachborde', profile: 'Profeel', search: 'Rechairche', letter: 'Laitre', recap: 'Rékapitolatif',
@@ -398,6 +461,25 @@ const translations = {
     humanView: 'Voire le profeel',
     humanHistory: 'Historike des rechairches', humanHistoryEmpty: 'Aucunne rechairche précédante',
     humanReload: 'Rechargé', humanDelete: 'Suprimé', humanAgo: 'il y a',
+    // Alerts
+    alerts: 'Alairtes', alertsTitle: 'Alairtes enploi', alertsEmpty: 'Aucunne alairte pour le momen.',
+    alertsSeeOffer: 'Voire l\'offre', alertsGenerateLetter: 'Généré une laitre', alertsMarkSeen: 'Marké come vu',
+    // Tracker
+    tracker: 'Suivi', trackerTitle: 'Suivi dé candidatur', trackerEmpty: 'Aucunne candidatur suivie.',
+    trackerAdd: 'Ajouté',
+    // Statuses
+    statusSent: 'Candidatur envoyé', statusFollowedUp: 'Relanse faite', statusInterview: 'Entretein obtenu',
+    statusRejected: 'Refu', statusWaiting: 'En atente',
+    // Application
+    applicationNotes: 'Nottes', applicationDelete: 'Suprimé', applicationSaved: 'Candidatur ajouté au suivi !',
+    // Dashboard extras
+    dashboardApplications: 'Mé candidatur', dashboardAlerts: 'Dairnières alairtes',
+    dashboardQuickSearch: 'Rechairche rapide', dashboardSearchPlaceholder: 'ex: dévelopeur fullstak Pari',
+    // Completion
+    completionLow: 'Profeel très inconplé', completionMid: 'Profeel en cour de conplécion',
+    completionHigh: 'Profeel préske conplé', completionFull: 'Profeel conplé !',
+    // Mark as sent
+    markAsSent: 'Marké come candidatur envoyé',
   },
 };
 
@@ -421,6 +503,8 @@ const Icon = {
   Logout: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
   People: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>,
   Download: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
+  Bell: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>,
+  Briefcase: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg>,
 };
 
 function ToastContainer({ toasts }) {
@@ -555,6 +639,8 @@ function App() {
     { key: 'profile', icon: Icon.Profile },
     { key: 'search', icon: Icon.Search },
     { key: 'human', icon: Icon.People },
+    { key: 'alerts', icon: Icon.Bell },
+    { key: 'tracker', icon: Icon.Briefcase },
     { key: 'letter', icon: Icon.Letter },
     { key: 'recap', icon: Icon.Recap },
   ];
@@ -566,8 +652,9 @@ function App() {
         <div className="sidebar-logo">JobHunter AI</div>
         <nav className="sidebar-nav">
           {navItems.map(({ key, icon: Ic }) => (
-            <div key={key} className={`nav-item ${page===key?'active':''}`} onClick={() => { setPage(key); setMenuOpen(false); if(key==='recap'||key==='dashboard'){loadStats();loadSaved();} }}>
+            <div key={key} className={`nav-item ${page===key?'active':''}`} onClick={() => { setPage(key); setMenuOpen(false); if(key==='recap'||key==='dashboard'){loadStats();loadSaved();} }} style={{position:'relative'}}>
               <Ic />{t(key)}
+              {key === 'alerts' && (stats.unseen_alerts || 0) > 0 && <span className="alert-badge">{stats.unseen_alerts}</span>}
             </div>
           ))}
         </nav>
@@ -583,10 +670,12 @@ function App() {
           <button className="mobile-menu-btn" onClick={() => setMenuOpen(true)}>&#9776;</button>
           <span style={{fontWeight:600,fontSize:16}}>JobHunter AI</span>
         </div>
-        {page === 'dashboard' && <DashboardPage stats={stats} profileComplete={profileComplete} setPage={setPage} user={user} />}
+        {page === 'dashboard' && <DashboardPage stats={stats} profile={profile} profileComplete={profileComplete} setPage={setPage} user={user} />}
         {page === 'profile' && <ProfilePage profile={profile} setProfile={setProfile} loadProfile={loadProfile} loadStats={loadStats} toast={toast} onLangChange={onLangChange} />}
         {page === 'search' && <SearchPage savedJobs={savedJobs} loadSaved={loadSaved} loadStats={loadStats} toast={toast} setPage={setPage} setStats={setStats} />}
         {page === 'human' && <HumanPage toast={toast} />}
+        {page === 'alerts' && <AlertsPage toast={toast} setPage={setPage} />}
+        {page === 'tracker' && <TrackerPage toast={toast} />}
         {page === 'letter' && <LetterPage savedJobs={savedJobs} loadStats={loadStats} toast={toast} />}
         {page === 'recap' && <RecapPage stats={stats} savedJobs={savedJobs} />}
       </div>
@@ -598,17 +687,82 @@ function App() {
 }
 
 /* ---- DASHBOARD ---- */
-function DashboardPage({ stats, profileComplete, setPage, user }) {
+function DashboardPage({ stats, profile, profileComplete, setPage, user }) {
   const firstName = (user?.name || '').split(' ')[0] || '';
+  const [quickSearch, setQuickSearch] = useState('');
+  const completionScore = profile.completion_score || 0;
+  const completionMsg = profile.completion_message || '';
+  const completionClass = completionScore >= 100 ? 'completion-full' : completionScore >= 75 ? 'completion-high' : completionScore >= 40 ? 'completion-mid' : 'completion-low';
+
+  const statusLabels = {
+    sent: t('statusSent'), followed_up: t('statusFollowedUp'), interview: t('statusInterview'),
+    rejected: t('statusRejected'), waiting: t('statusWaiting')
+  };
+
+  const handleQuickSearch = () => {
+    if (quickSearch.trim()) setPage('search');
+  };
+
   return (
     <div>
       <h1 className="page-title">{t('hello')} {firstName} 👋</h1>
-      {!profileComplete && <div className="banner banner-warning" style={{cursor:'pointer'}} onClick={() => setPage('profile')}>{t('completeProfile')}</div>}
+
+      {/* Profile completion bar */}
+      {!profileComplete && (
+        <div className="card" style={{cursor:'pointer'}} onClick={() => setPage('profile')}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+            <span style={{fontWeight:600,fontSize:14}}>{completionMsg || t('completeProfile')}</span>
+            <span style={{fontSize:13,color:'var(--text-secondary)'}}>{completionScore}%</span>
+          </div>
+          <div className="completion-bar"><div className={`completion-fill ${completionClass}`} style={{width:`${completionScore}%`}}/></div>
+        </div>
+      )}
+
+      {/* Quick search */}
+      <div className="card">
+        <h3 className="card-title" style={{marginBottom:12}}>{t('dashboardQuickSearch')}</h3>
+        <div style={{display:'flex',gap:12}}>
+          <input className="input" value={quickSearch} onChange={e=>setQuickSearch(e.target.value)} placeholder={t('dashboardSearchPlaceholder')} onKeyDown={e => e.key==='Enter' && handleQuickSearch()} style={{flex:1}} />
+          <button className="btn btn-primary" onClick={handleQuickSearch}>{t('searchBtn')}</button>
+        </div>
+      </div>
+
       <div className="stats-row">
         <div className="stat-card"><div className="stat-number">{stats.total_found}</div><div className="stat-label">{t('jobsFound')}</div></div>
         <div className="stat-card"><div className="stat-number">{stats.saved}</div><div className="stat-label">{t('jobsSaved')}</div></div>
         <div className="stat-card"><div className="stat-number">{stats.letters}</div><div className="stat-label">{t('lettersGenerated')}</div></div>
       </div>
+
+      {/* Applications summary */}
+      {stats.applications_by_status && Object.keys(stats.applications_by_status).length > 0 && (
+        <div className="card">
+          <h3 className="card-title" style={{marginBottom:12}}>{t('dashboardApplications')}</h3>
+          <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
+            {Object.entries(stats.applications_by_status).map(([status, count]) => (
+              <span key={status} className={`status-pill status-${status}`} style={{padding:'4px 14px',fontSize:13,cursor:'pointer'}} onClick={() => setPage('tracker')}>
+                {count} {statusLabels[status] || status}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Recent alerts */}
+      {stats.recent_alerts && stats.recent_alerts.length > 0 && (
+        <div className="card">
+          <h3 className="card-title" style={{marginBottom:12}}>{t('dashboardAlerts')}</h3>
+          {stats.recent_alerts.map((alert, i) => (
+            <div key={i} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 0',borderBottom: i < stats.recent_alerts.length - 1 ? '1px solid var(--border)' : 'none',cursor:'pointer'}} onClick={() => setPage('alerts')}>
+              <div className={`score-badge ${alert.score>=7?'score-high':alert.score>=4?'score-mid':'score-low'}`} style={{width:36,height:36,fontSize:13}}>{Math.round(alert.score)}</div>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:600,fontSize:14}}>{alert.job_title}</div>
+                <div style={{fontSize:12,color:'var(--text-secondary)'}}>{alert.company}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="card">
         <h3 className="card-title">{t('getStarted')}</h3>
         <div className="action-grid" style={{marginTop:16}}>
@@ -915,7 +1069,8 @@ function LetterPage({ savedJobs, loadStats, toast }) {
   const [letterLang, setLetterLang] = useState('fr');
   const [loading, setLoading] = useState(false);
   const [letter, setLetter] = useState('');
-  const [letterJob, setLetterJob] = useState({ title: '', company: '' });
+  const [letterJob, setLetterJob] = useState({ title: '', company: '', url: '' });
+  const [markedSent, setMarkedSent] = useState(false);
 
   const generate = async () => {
     let jobTitle = '', company = '', jobDesc = '', jobUrl = '', jobLocation = '', jobExplanation = '';
@@ -927,14 +1082,22 @@ function LetterPage({ savedJobs, loadStats, toast }) {
       if (!manualDesc.trim()) { toast(t('pasteDesc'), 'error'); return; }
       jobDesc = manualDesc; jobTitle = 'Poste décrit manuellement';
     }
-    setLoading(true);
+    setLoading(true); setMarkedSent(false);
     try {
       const data = await api('/api/letter', { method: 'POST', body: JSON.stringify({ job_title: jobTitle, company, job_description: jobDesc, job_url: jobUrl, job_location: jobLocation, job_explanation: jobExplanation, instruction, letter_language: letterLang }) });
       setLetter(data.letter);
-      setLetterJob({ title: data.job_title, company: data.company });
+      setLetterJob({ title: data.job_title, company: data.company, url: jobUrl });
       await loadStats();
     } catch(e) { toast(e.message, 'error'); }
     setLoading(false);
+  };
+
+  const markAsSent = async () => {
+    try {
+      await api('/api/applications', { method: 'POST', body: JSON.stringify({ job_title: letterJob.title, company: letterJob.company, url: letterJob.url, status: 'sent', notes: '' }) });
+      toast(t('applicationSaved'));
+      setMarkedSent(true);
+    } catch(e) { toast(e.message, 'error'); }
   };
 
   const copyLetter = () => { navigator.clipboard.writeText(letter); toast(t('letterCopied')); };
@@ -984,7 +1147,9 @@ function LetterPage({ savedJobs, loadStats, toast }) {
             {letterJob.company && <span style={{color:'var(--text-secondary)'}}> — {letterJob.company}</span>}
           </div>
           <textarea className="textarea" style={{minHeight:400,lineHeight:1.8,whiteSpace:'pre-wrap'}} value={letter} onChange={e => setLetter(e.target.value)} />
-          <div style={{display:'flex',gap:12,marginTop:16,justifyContent:'flex-end'}}>
+          <div style={{display:'flex',gap:12,marginTop:16,justifyContent:'flex-end',flexWrap:'wrap'}}>
+            {!markedSent && <button className="btn btn-outline" style={{borderColor:'var(--success)',color:'var(--success)'}} onClick={markAsSent}>{t('markAsSent')}</button>}
+            {markedSent && <span style={{display:'flex',alignItems:'center',color:'var(--success)',fontSize:13,fontWeight:500}}>&#10003; {t('applicationSaved')}</span>}
             <button className="btn btn-outline" onClick={copyLetter}>{t('copyLetter')}</button>
             <button className="btn btn-primary" onClick={generate}>{t('regenerate')}</button>
           </div>
@@ -1215,6 +1380,178 @@ function HumanPage({ toast }) {
       )}
       {searched && !loading && people.length === 0 && (
         <div className="card" style={{textAlign:'center',color:'var(--text-secondary)'}}>{t('humanNoResults')}</div>
+      )}
+    </div>
+  );
+}
+
+/* ---- ALERTS PAGE ---- */
+function AlertsPage({ toast, setPage }) {
+  const [alerts, setAlerts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [unseenCount, setUnseenCount] = useState(0);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await api('/api/alerts');
+        setAlerts(data.alerts || []);
+        setUnseenCount(data.unseen_count || 0);
+      } catch(e) { toast(e.message, 'error'); }
+      setLoading(false);
+    })();
+  }, []);
+
+  const markSeen = async (id) => {
+    try {
+      await api(`/api/alerts/seen/${id}`, { method: 'POST' });
+      setAlerts(prev => prev.map(a => a.id === id ? { ...a, seen: true } : a));
+      setUnseenCount(prev => Math.max(0, prev - 1));
+    } catch(e) { toast(e.message, 'error'); }
+  };
+
+  const scoreClass = (s) => s >= 7 ? 'score-high' : s >= 4 ? 'score-mid' : 'score-low';
+
+  return (
+    <div>
+      <h1 className="page-title">{t('alertsTitle')}</h1>
+      {loading && <div><div className="spinner"/><div className="loading-text">{t('loading')}</div></div>}
+      {!loading && alerts.length === 0 && (
+        <div className="card" style={{textAlign:'center',color:'var(--text-secondary)'}}>{t('alertsEmpty')}</div>
+      )}
+      {!loading && alerts.map(alert => (
+        <div key={alert.id} className="job-card" style={{opacity: alert.seen ? 0.7 : 1, borderLeft: !alert.seen ? '3px solid var(--accent)' : '3px solid transparent'}}
+          onClick={() => { if (!alert.seen) markSeen(alert.id); }}>
+          <div className={`score-badge ${scoreClass(alert.score)}`}>{Math.round(alert.score)}</div>
+          <div className="job-info">
+            <div className="job-title">{alert.job_title}</div>
+            <div className="job-meta"><span>{alert.company}</span></div>
+            {alert.explanation && <div className="job-explanation">{alert.explanation}</div>}
+          </div>
+          <div className="job-actions">
+            {alert.url && <a href={alert.url} target="_blank" rel="noopener noreferrer" className="btn btn-outline" style={{fontSize:12,padding:'6px 12px'}}>{t('alertsSeeOffer')}</a>}
+            <button className="btn btn-primary" style={{fontSize:12,padding:'6px 12px'}} onClick={(e) => { e.stopPropagation(); setPage('letter'); }}>{t('alertsGenerateLetter')}</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ---- TRACKER PAGE ---- */
+function TrackerPage({ toast }) {
+  const [applications, setApplications] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [formTitle, setFormTitle] = useState('');
+  const [formCompany, setFormCompany] = useState('');
+  const [formUrl, setFormUrl] = useState('');
+
+  const statuses = ['sent', 'followed_up', 'interview', 'rejected', 'waiting'];
+  const statusLabels = {
+    sent: t('statusSent'), followed_up: t('statusFollowedUp'), interview: t('statusInterview'),
+    rejected: t('statusRejected'), waiting: t('statusWaiting')
+  };
+
+  const loadApps = async () => {
+    try {
+      const data = await api('/api/applications');
+      setApplications(data || []);
+    } catch(e) { toast(e.message, 'error'); }
+    setLoading(false);
+  };
+
+  useEffect(() => { loadApps(); }, []);
+
+  const addApp = async () => {
+    if (!formTitle.trim() || !formCompany.trim()) return;
+    try {
+      await api('/api/applications', { method: 'POST', body: JSON.stringify({ job_title: formTitle, company: formCompany, url: formUrl, status: 'sent', notes: '' }) });
+      toast(t('applicationSaved'));
+      setFormTitle(''); setFormCompany(''); setFormUrl(''); setShowForm(false);
+      await loadApps();
+    } catch(e) { toast(e.message, 'error'); }
+  };
+
+  const updateApp = async (id, updates) => {
+    try {
+      await api(`/api/applications/${id}`, { method: 'PATCH', body: JSON.stringify(updates) });
+      setApplications(prev => prev.map(a => a.id === id ? { ...a, ...updates } : a));
+    } catch(e) { toast(e.message, 'error'); }
+  };
+
+  const deleteApp = async (id) => {
+    try {
+      await api(`/api/applications/${id}`, { method: 'DELETE' });
+      setApplications(prev => prev.filter(a => a.id !== id));
+    } catch(e) { toast(e.message, 'error'); }
+  };
+
+  const formatDate = (d) => d ? new Date(d).toLocaleDateString('fr-FR') : '';
+
+  return (
+    <div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+        <h1 className="page-title" style={{marginBottom:0}}>{t('trackerTitle')}</h1>
+        <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>{t('trackerAdd')}</button>
+      </div>
+
+      {showForm && (
+        <div className="card">
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,marginBottom:12}}>
+            <div>
+              <label className="input-label">{t('keywords')}</label>
+              <input className="input" value={formTitle} onChange={e=>setFormTitle(e.target.value)} placeholder="Job title" />
+            </div>
+            <div>
+              <label className="input-label">{t('humanCompany')}</label>
+              <input className="input" value={formCompany} onChange={e=>setFormCompany(e.target.value)} placeholder="Company" />
+            </div>
+            <div>
+              <label className="input-label">URL</label>
+              <input className="input" value={formUrl} onChange={e=>setFormUrl(e.target.value)} placeholder="https://..." />
+            </div>
+          </div>
+          <button className="btn btn-primary" onClick={addApp}>{t('trackerAdd')}</button>
+        </div>
+      )}
+
+      {loading && <div><div className="spinner"/><div className="loading-text">{t('loading')}</div></div>}
+
+      {!loading && applications.length === 0 && !showForm && (
+        <div className="card" style={{textAlign:'center',color:'var(--text-secondary)'}}>{t('trackerEmpty')}</div>
+      )}
+
+      {!loading && applications.length > 0 && (
+        <div className="kanban-board">
+          {statuses.map(status => {
+            const cards = applications.filter(a => a.status === status);
+            return (
+              <div key={status} className="kanban-column">
+                <div className="kanban-header">
+                  <span>{statusLabels[status]}</span>
+                  <span className="count-badge">{cards.length}</span>
+                </div>
+                {cards.map(app => (
+                  <div key={app.id} className="kanban-card">
+                    <div style={{fontWeight:600,fontSize:14,marginBottom:4}}>{app.job_title}</div>
+                    <div style={{fontSize:12,color:'var(--text-secondary)',marginBottom:6}}>{app.company}</div>
+                    <div style={{fontSize:11,color:'var(--text-secondary)',marginBottom:8}}>{formatDate(app.applied_at || app.created_at)}</div>
+                    <select className="input" style={{fontSize:12,padding:'4px 8px',marginBottom:8}} value={app.status} onChange={e => updateApp(app.id, { status: e.target.value })}>
+                      {statuses.map(s => <option key={s} value={s}>{statusLabels[s]}</option>)}
+                    </select>
+                    <textarea className="textarea" style={{fontSize:12,minHeight:50,marginBottom:8}} placeholder={t('applicationNotes')}
+                      defaultValue={app.notes || ''} onBlur={e => { if (e.target.value !== (app.notes || '')) updateApp(app.id, { notes: e.target.value }); }} />
+                    <div style={{display:'flex',gap:8}}>
+                      {app.url && <a href={app.url} target="_blank" rel="noopener noreferrer" className="btn btn-outline" style={{fontSize:11,padding:'3px 8px'}}>{t('viewOffer')}</a>}
+                      <button className="btn btn-outline" style={{fontSize:11,padding:'3px 8px',color:'var(--danger)',borderColor:'var(--danger)'}} onClick={() => deleteApp(app.id)}>{t('applicationDelete')}</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );
