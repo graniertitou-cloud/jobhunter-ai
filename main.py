@@ -113,6 +113,17 @@ class GeneratedLetter(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class PeopleSearchHistory(Base):
+    __tablename__ = "people_search_history"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    keywords_json = Column(Text, default="[]")  # JSON list of keywords
+    location = Column(String, default="")
+    results_json = Column(Text, default="[]")    # JSON list of results
+    result_count = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 Base.metadata.create_all(engine)
 
 # --- Migration: add new columns if missing ---
@@ -1160,10 +1171,62 @@ def scrape_linkedin_people(keywords_list: list[str], location: str) -> list[dict
 @app.post("/api/search/people")
 def search_people(req: PeopleSearchRequest, request: Request):
     user = require_user(request)
-    # Support both list and single keyword
     kw_list = req.keywords if req.keywords else ([req.keyword] if req.keyword else [])
     kw_list = [k for k in kw_list if k and k.strip()][:3]
     if not kw_list:
         return {"people": [], "count": 0}
     results = scrape_linkedin_people(kw_list, req.location)
+    # Save to history
+    db = SessionLocal()
+    try:
+        entry = PeopleSearchHistory(
+            user_id=user.id,
+            keywords_json=json.dumps(kw_list),
+            location=req.location,
+            results_json=json.dumps(results),
+            result_count=len(results),
+        )
+        db.add(entry)
+        db.commit()
+    except Exception as e:
+        logger.warning(f"Failed to save search history: {e}")
+    finally:
+        db.close()
     return {"people": results, "count": len(results)}
+
+
+@app.get("/api/search/people/history")
+def get_people_history(request: Request):
+    user = require_user(request)
+    db = SessionLocal()
+    try:
+        entries = db.query(PeopleSearchHistory).filter(
+            PeopleSearchHistory.user_id == user.id
+        ).order_by(PeopleSearchHistory.created_at.desc()).limit(20).all()
+        return {"history": [{
+            "id": e.id,
+            "keywords": json.loads(e.keywords_json),
+            "location": e.location,
+            "result_count": e.result_count,
+            "results": json.loads(e.results_json),
+            "created_at": e.created_at.isoformat() if e.created_at else "",
+        } for e in entries]}
+    finally:
+        db.close()
+
+
+@app.delete("/api/search/people/history/{entry_id}")
+def delete_people_history(entry_id: int, request: Request):
+    user = require_user(request)
+    db = SessionLocal()
+    try:
+        entry = db.query(PeopleSearchHistory).filter(
+            PeopleSearchHistory.id == entry_id,
+            PeopleSearchHistory.user_id == user.id,
+        ).first()
+        if entry:
+            db.delete(entry)
+            db.commit()
+        return {"ok": True}
+    finally:
+        db.close()
