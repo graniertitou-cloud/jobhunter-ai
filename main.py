@@ -959,3 +959,157 @@ Tu aides le candidat dans sa recherche d'emploi.
     except Exception as e:
         logger.error(f"Chat error: {e}")
         raise HTTPException(500, "Erreur de l'assistant IA.")
+
+
+# --- People Search ---
+class PeopleSearchRequest(BaseModel):
+    keywords: str
+    location: str = ""
+
+
+def scrape_linkedin_people(keywords: str, location: str) -> list[dict]:
+    """Search for people on LinkedIn via Google dorking."""
+    people = []
+    query = f'site:linkedin.com/in/ "{keywords}"'
+    if location:
+        query += f' "{location}"'
+
+    try:
+        # Use Google search to find LinkedIn profiles
+        url = f"https://www.google.com/search?q={quote(query)}&num=40"
+        google_headers = {
+            **HEADERS,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        }
+        resp = requests.get(url, headers=google_headers, timeout=15)
+        if resp.status_code != 200:
+            logger.warning(f"Google search returned {resp.status_code}")
+            return people
+
+        soup = BeautifulSoup(resp.content, "lxml")
+
+        # Parse Google results
+        for g in soup.select("div.g, div[data-sokoban-container]"):
+            link_el = g.find("a", href=True)
+            if not link_el:
+                continue
+            href = link_el["href"]
+            # Only keep linkedin.com/in/ links
+            if "linkedin.com/in/" not in href:
+                continue
+
+            # Clean URL
+            if href.startswith("/url?q="):
+                href = href.split("/url?q=")[1].split("&")[0]
+
+            # Extract name from title
+            title_el = g.find("h3")
+            if not title_el:
+                continue
+            title_text = title_el.get_text(strip=True)
+
+            # Parse title: "Prénom Nom - Titre - Entreprise | LinkedIn"
+            title_clean = title_text.replace(" | LinkedIn", "").replace(" - LinkedIn", "")
+            parts = [p.strip() for p in title_clean.split(" - ")]
+            name = parts[0] if parts else title_text
+            title_role = parts[1] if len(parts) > 1 else ""
+            company = parts[2] if len(parts) > 2 else ""
+
+            # If company is in the role, try to split
+            if not company and " chez " in title_role:
+                role_parts = title_role.split(" chez ")
+                title_role = role_parts[0]
+                company = role_parts[1] if len(role_parts) > 1 else ""
+            if not company and " at " in title_role:
+                role_parts = title_role.split(" at ")
+                title_role = role_parts[0]
+                company = role_parts[1] if len(role_parts) > 1 else ""
+
+            # Extract snippet for location
+            snippet_el = g.find("div", class_="VwiC3b") or g.find("span", class_="st")
+            snippet = snippet_el.get_text(strip=True) if snippet_el else ""
+            loc = ""
+            # Try to find location patterns in snippet
+            loc_patterns = [
+                r"([\w\s-]+,\s*[\w\s-]+(?:,\s*[\w\s-]+)?)\s*[·\-]",
+                r"Région de ([\w\s-]+)",
+                r"(Paris|Lyon|Marseille|Toulouse|Bordeaux|Lille|Nantes|Strasbourg|Nice|Montpellier|[\w\s]+, France)",
+            ]
+            for pattern in loc_patterns:
+                m = re.search(pattern, snippet)
+                if m:
+                    loc = m.group(1).strip()
+                    break
+
+            if not loc and location:
+                loc = location
+
+            # Avoid duplicates
+            if any(p["linkedin_url"] == href for p in people):
+                continue
+
+            people.append({
+                "name": name,
+                "title": title_role,
+                "company": company,
+                "location": loc,
+                "linkedin_url": href,
+                "snippet": snippet[:200],
+            })
+
+        time.sleep(random.uniform(1, 2))
+
+    except Exception as e:
+        logger.warning(f"People search error: {e}")
+
+    # Fallback: try DuckDuckGo if Google gave no results
+    if not people:
+        try:
+            ddg_query = f'site:linkedin.com/in/ {keywords}'
+            if location:
+                ddg_query += f' {location}'
+            ddg_url = f"https://html.duckduckgo.com/html/?q={quote(ddg_query)}"
+            resp = requests.get(ddg_url, headers=HEADERS, timeout=15)
+            if resp.status_code == 200:
+                soup = BeautifulSoup(resp.content, "lxml")
+                for result in soup.select("div.result"):
+                    link_el = result.find("a", class_="result__a")
+                    if not link_el:
+                        continue
+                    href = link_el.get("href", "")
+                    if "linkedin.com/in/" not in href:
+                        continue
+
+                    title_text = link_el.get_text(strip=True)
+                    title_clean = title_text.replace(" | LinkedIn", "").replace(" - LinkedIn", "")
+                    parts = [p.strip() for p in title_clean.split(" - ")]
+                    name = parts[0] if parts else title_text
+                    title_role = parts[1] if len(parts) > 1 else ""
+                    company = parts[2] if len(parts) > 2 else ""
+
+                    snippet_el = result.find("a", class_="result__snippet")
+                    snippet = snippet_el.get_text(strip=True) if snippet_el else ""
+
+                    if any(p["linkedin_url"] == href for p in people):
+                        continue
+
+                    people.append({
+                        "name": name,
+                        "title": title_role,
+                        "company": company,
+                        "location": location or "",
+                        "linkedin_url": href,
+                        "snippet": snippet[:200],
+                    })
+            time.sleep(random.uniform(1, 2))
+        except Exception as e:
+            logger.warning(f"DuckDuckGo fallback error: {e}")
+
+    return people
+
+
+@app.post("/api/search/people")
+def search_people(req: PeopleSearchRequest, request: Request):
+    user = require_user(request)
+    results = scrape_linkedin_people(req.keywords, req.location)
+    return {"people": results, "count": len(results)}
