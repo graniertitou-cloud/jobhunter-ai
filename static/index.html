@@ -386,7 +386,7 @@ const translations = {
     alertsSeeOffer: 'Voir l\'offre', alertsGenerateLetter: 'Générer une lettre', alertsMarkSeen: 'Marquer comme vu',
     // Tracker
     tracker: 'Suivi', trackerTitle: 'Suivi des candidatures', trackerEmpty: 'Aucune candidature suivie.',
-    trackerAdd: 'Ajouter',
+    trackerAdd: 'Ajouter', jobTitle: 'Titre du poste', status: 'Statut',
     // Statuses
     statusSent: 'Candidature envoyée', statusFollowedUp: 'Relance faite', statusInterview: 'Entretien obtenu',
     statusRejected: 'Refus', statusWaiting: 'En attente',
@@ -509,7 +509,7 @@ const translations = {
     alertsSeeOffer: 'View offer', alertsGenerateLetter: 'Generate letter', alertsMarkSeen: 'Mark as seen',
     // Tracker
     tracker: 'Tracker', trackerTitle: 'Application Tracker', trackerEmpty: 'No tracked applications.',
-    trackerAdd: 'Add',
+    trackerAdd: 'Add', jobTitle: 'Job title', status: 'Status',
     // Statuses
     statusSent: 'Sent', statusFollowedUp: 'Followed up', statusInterview: 'Interview',
     statusRejected: 'Rejected', statusWaiting: 'Waiting',
@@ -632,7 +632,7 @@ const translations = {
     alertsSeeOffer: 'Voire l\'offre', alertsGenerateLetter: 'Généré une laitre', alertsMarkSeen: 'Marké come vu',
     // Tracker
     tracker: 'Suivi', trackerTitle: 'Suivi dé candidatur', trackerEmpty: 'Aucunne candidatur suivie.',
-    trackerAdd: 'Ajouté',
+    trackerAdd: 'Ajouté', jobTitle: 'Titre du poste', status: 'Statut',
     // Statuses
     statusSent: 'Candidatur envoyé', statusFollowedUp: 'Relanse faite', statusInterview: 'Entretein obtenu',
     statusRejected: 'Refu', statusWaiting: 'En atente',
@@ -1843,6 +1843,8 @@ function TrackerPage({ toast, setPage }) {
   const [formTitle, setFormTitle] = useState('');
   const [formCompany, setFormCompany] = useState('');
   const [formUrl, setFormUrl] = useState('');
+  const [formStatus, setFormStatus] = useState('sent');
+  const [formNotes, setFormNotes] = useState('');
 
   const statuses = ['sent', 'followed_up', 'interview', 'rejected', 'waiting'];
   const statusLabels = {
@@ -1863,9 +1865,9 @@ function TrackerPage({ toast, setPage }) {
   const addApp = async () => {
     if (!formTitle.trim() || !formCompany.trim()) return;
     try {
-      await api('/api/applications', { method: 'POST', body: JSON.stringify({ job_title: formTitle, company: formCompany, url: formUrl, status: 'sent', notes: '' }) });
+      await api('/api/applications', { method: 'POST', body: JSON.stringify({ job_title: formTitle, company: formCompany, url: formUrl, status: formStatus, notes: formNotes }) });
       toast(t('applicationSaved'));
-      setFormTitle(''); setFormCompany(''); setFormUrl(''); setShowForm(false);
+      setFormTitle(''); setFormCompany(''); setFormUrl(''); setFormStatus('sent'); setFormNotes(''); setShowForm(false);
       await loadApps();
     } catch(e) { toast(e.message, 'error'); }
   };
@@ -1895,19 +1897,31 @@ function TrackerPage({ toast, setPage }) {
 
       {showForm && (
         <div className="card">
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,marginBottom:12}}>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
             <div>
-              <label className="input-label">{t('keywords')}</label>
-              <input className="input" value={formTitle} onChange={e=>setFormTitle(e.target.value)} placeholder="Job title" maxLength={200} />
+              <label className="input-label">{t('jobTitle')}</label>
+              <input className="input" value={formTitle} onChange={e=>setFormTitle(e.target.value)} placeholder="ex: Product Manager" maxLength={200} />
             </div>
             <div>
               <label className="input-label">{t('humanCompany')}</label>
-              <input className="input" value={formCompany} onChange={e=>setFormCompany(e.target.value)} placeholder="Company" maxLength={200} />
+              <input className="input" value={formCompany} onChange={e=>setFormCompany(e.target.value)} placeholder="ex: Google" maxLength={200} />
             </div>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
             <div>
               <label className="input-label">URL</label>
               <input className="input" value={formUrl} onChange={e=>setFormUrl(e.target.value)} placeholder="https://..." maxLength={2000} />
             </div>
+            <div>
+              <label className="input-label">{t('status')}</label>
+              <select className="input" value={formStatus} onChange={e=>setFormStatus(e.target.value)}>
+                {statuses.map(s => <option key={s} value={s}>{statusLabels[s]}</option>)}
+              </select>
+            </div>
+          </div>
+          <div style={{marginBottom:12}}>
+            <label className="input-label">Notes</label>
+            <textarea className="textarea" value={formNotes} onChange={e=>setFormNotes(e.target.value)} placeholder="ex: Entretien le 20 mars à 14h, contact: jean@company.com" maxLength={5000} rows={3} />
           </div>
           <button className="btn btn-primary" onClick={addApp}>{t('trackerAdd')}</button>
         </div>
