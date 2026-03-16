@@ -9,7 +9,7 @@ import time
 import uuid
 from datetime import datetime
 from typing import Optional
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 
 import hashlib
 
@@ -967,143 +967,136 @@ class PeopleSearchRequest(BaseModel):
     location: str = ""
 
 
+def _parse_linkedin_title(title_text: str) -> dict:
+    """Parse a LinkedIn search result title into name/title/company."""
+    title_clean = title_text.replace(" | LinkedIn", "").replace(" - LinkedIn", "").replace(" – LinkedIn", "")
+    parts = [p.strip() for p in title_clean.split(" - ")]
+    name = parts[0] if parts else title_text
+    title_role = parts[1] if len(parts) > 1 else ""
+    company = parts[2] if len(parts) > 2 else ""
+    if not company and " chez " in title_role:
+        role_parts = title_role.split(" chez ")
+        title_role = role_parts[0]
+        company = role_parts[1] if len(role_parts) > 1 else ""
+    if not company and " at " in title_role:
+        role_parts = title_role.split(" at ")
+        title_role = role_parts[0]
+        company = role_parts[1] if len(role_parts) > 1 else ""
+    return {"name": name, "title": title_role, "company": company}
+
+
+def _extract_location(snippet: str, fallback: str) -> str:
+    """Try to extract location from snippet text."""
+    loc_patterns = [
+        r"Location:\s*([\w\s,.-]+?)(?:\s*·|\s*$)",
+        r"([\w\s-]+,\s*[\w\s-]+(?:,\s*[\w\s-]+)?)\s*[·\-]",
+        r"Région de ([\w\s-]+)",
+        r"(Paris|Lyon|Marseille|Toulouse|Bordeaux|Lille|Nantes|Strasbourg|Nice|Montpellier|[\w\s]+, France)",
+    ]
+    for pattern in loc_patterns:
+        m = re.search(pattern, snippet)
+        if m:
+            return m.group(1).strip()
+    return fallback
+
+
 def scrape_linkedin_people(keywords: str, location: str) -> list[dict]:
-    """Search for people on LinkedIn via Google dorking."""
+    """Search for people on LinkedIn using ddgs library."""
     people = []
-    query = f'site:linkedin.com/in/ "{keywords}"'
+    seen_urls = set()
+
+    def add_person(name, title_role, company, loc, href, snippet=""):
+        if href in seen_urls:
+            return
+        if "?" in href:
+            href = href.split("?")[0]
+        seen_urls.add(href)
+        people.append({
+            "name": name, "title": title_role, "company": company,
+            "location": loc, "linkedin_url": href, "snippet": snippet[:200],
+        })
+
+    base_query = f'site:linkedin.com/in/ {keywords}'
     if location:
-        query += f' "{location}"'
+        base_query += f' {location}'
 
+    # Method 1: DuckDuckGo lite (most reliable, no JS needed)
     try:
-        # Use Google search to find LinkedIn profiles
-        url = f"https://www.google.com/search?q={quote(query)}&num=40"
-        google_headers = {
-            **HEADERS,
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        }
-        resp = requests.get(url, headers=google_headers, timeout=15)
-        if resp.status_code != 200:
-            logger.warning(f"Google search returned {resp.status_code}")
-            return people
-
-        soup = BeautifulSoup(resp.content, "lxml")
-
-        # Parse Google results
-        for g in soup.select("div.g, div[data-sokoban-container]"):
-            link_el = g.find("a", href=True)
-            if not link_el:
-                continue
-            href = link_el["href"]
-            # Only keep linkedin.com/in/ links
-            if "linkedin.com/in/" not in href:
-                continue
-
-            # Clean URL
-            if href.startswith("/url?q="):
-                href = href.split("/url?q=")[1].split("&")[0]
-
-            # Extract name from title
-            title_el = g.find("h3")
-            if not title_el:
-                continue
-            title_text = title_el.get_text(strip=True)
-
-            # Parse title: "Prénom Nom - Titre - Entreprise | LinkedIn"
-            title_clean = title_text.replace(" | LinkedIn", "").replace(" - LinkedIn", "")
-            parts = [p.strip() for p in title_clean.split(" - ")]
-            name = parts[0] if parts else title_text
-            title_role = parts[1] if len(parts) > 1 else ""
-            company = parts[2] if len(parts) > 2 else ""
-
-            # If company is in the role, try to split
-            if not company and " chez " in title_role:
-                role_parts = title_role.split(" chez ")
-                title_role = role_parts[0]
-                company = role_parts[1] if len(role_parts) > 1 else ""
-            if not company and " at " in title_role:
-                role_parts = title_role.split(" at ")
-                title_role = role_parts[0]
-                company = role_parts[1] if len(role_parts) > 1 else ""
-
-            # Extract snippet for location
-            snippet_el = g.find("div", class_="VwiC3b") or g.find("span", class_="st")
-            snippet = snippet_el.get_text(strip=True) if snippet_el else ""
-            loc = ""
-            # Try to find location patterns in snippet
-            loc_patterns = [
-                r"([\w\s-]+,\s*[\w\s-]+(?:,\s*[\w\s-]+)?)\s*[·\-]",
-                r"Région de ([\w\s-]+)",
-                r"(Paris|Lyon|Marseille|Toulouse|Bordeaux|Lille|Nantes|Strasbourg|Nice|Montpellier|[\w\s]+, France)",
-            ]
-            for pattern in loc_patterns:
-                m = re.search(pattern, snippet)
-                if m:
-                    loc = m.group(1).strip()
-                    break
-
-            if not loc and location:
-                loc = location
-
-            # Avoid duplicates
-            if any(p["linkedin_url"] == href for p in people):
-                continue
-
-            people.append({
-                "name": name,
-                "title": title_role,
-                "company": company,
-                "location": loc,
-                "linkedin_url": href,
-                "snippet": snippet[:200],
-            })
-
-        time.sleep(random.uniform(1, 2))
-
+        ddg_url = f"https://lite.duckduckgo.com/lite/?q={quote(base_query)}"
+        resp = requests.post(ddg_url, data={"q": base_query}, headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Content-Type": "application/x-www-form-urlencoded",
+        }, timeout=15)
+        logger.info(f"DDG lite status: {resp.status_code}")
+        if resp.status_code == 200:
+            soup = BeautifulSoup(resp.content, "lxml")
+            for link in soup.find_all("a", href=True):
+                href = link["href"]
+                if "linkedin.com/in/" not in href:
+                    continue
+                # Clean DDG redirect URLs
+                if "duckduckgo.com" in href and "uddg=" in href:
+                    href = unquote(href.split("uddg=")[1].split("&")[0])
+                title_text = link.get_text(strip=True)
+                if not title_text or title_text == href:
+                    continue
+                parsed = _parse_linkedin_title(title_text)
+                # Get snippet from next sibling or parent
+                snippet_td = link.find_parent("tr")
+                snippet = ""
+                if snippet_td:
+                    next_tr = snippet_td.find_next_sibling("tr")
+                    if next_tr:
+                        snippet = next_tr.get_text(strip=True)
+                loc = _extract_location(snippet, location or "")
+                add_person(parsed["name"], parsed["title"], parsed["company"], loc, href, snippet)
     except Exception as e:
-        logger.warning(f"People search error: {e}")
+        logger.warning(f"DDG lite error: {e}")
 
-    # Fallback: try DuckDuckGo if Google gave no results
+    # Method 2: ddgs library (if available)
     if not people:
         try:
-            ddg_query = f'site:linkedin.com/in/ {keywords}'
-            if location:
-                ddg_query += f' {location}'
-            ddg_url = f"https://html.duckduckgo.com/html/?q={quote(ddg_query)}"
-            resp = requests.get(ddg_url, headers=HEADERS, timeout=15)
+            from ddgs import DDGS
+            results = DDGS().text(base_query, max_results=50)
+            logger.info(f"DDGS library returned {len(results)} results")
+            for r in results:
+                href = r.get("href", "")
+                if "linkedin.com/in/" not in href:
+                    continue
+                title_text = r.get("title", "")
+                parsed = _parse_linkedin_title(title_text)
+                snippet = r.get("body", "")
+                loc = _extract_location(snippet, location or "")
+                add_person(parsed["name"], parsed["title"], parsed["company"], loc, href, snippet)
+        except Exception as e:
+            logger.warning(f"DDGS library error: {e}")
+
+    # Fallback: Bing scraping
+    if not people:
+        try:
+            bing_url = f"https://www.bing.com/search?q={quote(base_query)}&count=50"
+            resp = requests.get(bing_url, headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            }, timeout=15)
+            logger.info(f"Bing fallback status: {resp.status_code}")
             if resp.status_code == 200:
                 soup = BeautifulSoup(resp.content, "lxml")
-                for result in soup.select("div.result"):
-                    link_el = result.find("a", class_="result__a")
+                for li in soup.select("li.b_algo"):
+                    link_el = li.find("a", href=True)
                     if not link_el:
                         continue
-                    href = link_el.get("href", "")
+                    href = link_el["href"]
                     if "linkedin.com/in/" not in href:
                         continue
-
                     title_text = link_el.get_text(strip=True)
-                    title_clean = title_text.replace(" | LinkedIn", "").replace(" - LinkedIn", "")
-                    parts = [p.strip() for p in title_clean.split(" - ")]
-                    name = parts[0] if parts else title_text
-                    title_role = parts[1] if len(parts) > 1 else ""
-                    company = parts[2] if len(parts) > 2 else ""
-
-                    snippet_el = result.find("a", class_="result__snippet")
+                    parsed = _parse_linkedin_title(title_text)
+                    snippet_el = li.find("p") or li.find("div", class_="b_caption")
                     snippet = snippet_el.get_text(strip=True) if snippet_el else ""
-
-                    if any(p["linkedin_url"] == href for p in people):
-                        continue
-
-                    people.append({
-                        "name": name,
-                        "title": title_role,
-                        "company": company,
-                        "location": location or "",
-                        "linkedin_url": href,
-                        "snippet": snippet[:200],
-                    })
-            time.sleep(random.uniform(1, 2))
+                    loc = _extract_location(snippet, location or "")
+                    add_person(parsed["name"], parsed["title"], parsed["company"], loc, href, snippet)
         except Exception as e:
-            logger.warning(f"DuckDuckGo fallback error: {e}")
+            logger.warning(f"Bing fallback error: {e}")
 
     return people
 
