@@ -16,7 +16,13 @@ import hashlib
 import pdfplumber
 import requests
 from bs4 import BeautifulSoup
-from playwright.async_api import async_playwright
+
+try:
+    from playwright.async_api import async_playwright
+    HAS_PLAYWRIGHT = True
+except ImportError:
+    HAS_PLAYWRIGHT = False
+
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
@@ -397,6 +403,9 @@ def scrape_linkedin(keywords: str, location: str) -> list[dict]:
 async def scrape_wttj_async(keywords: str, location: str) -> list[dict]:
     """Scrape Welcome to the Jungle with Playwright (headless browser)."""
     jobs = []
+    if not HAS_PLAYWRIGHT:
+        logger.warning("Playwright not available, skipping WTTJ")
+        return jobs
     try:
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)

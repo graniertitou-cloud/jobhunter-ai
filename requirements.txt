@@ -9,4 +9,3 @@ lxml
 pdfplumber
 python-multipart
 psycopg2-binary
-playwright
