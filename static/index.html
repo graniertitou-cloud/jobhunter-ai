@@ -1054,12 +1054,14 @@ function clearAuth() {
 /* ===== API Helper ===== */
 
 async function api(path, options = {}) {
-    const headers = { Authorization: `Bearer ${getToken()}`, ...(options.headers || {}) };
+    const token = getToken();
+    const headers = { ...(options.headers || {}) };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
     if (!(options.body instanceof FormData)) {
         headers['Content-Type'] = 'application/json';
     }
     const res = await fetch(path, { ...options, headers });
-    if (res.status === 401) {
+    if (res.status === 401 && !path.includes('/auth/login') && !path.includes('/auth/register')) {
         clearAuth();
         window.location.reload();
         throw new Error('Session expiree');
