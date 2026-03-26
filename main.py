@@ -1731,6 +1731,32 @@ def admin_update_student(
     return {"status": "ok", "id": student.id}
 
 
+@app.post("/api/admin/students/{student_id}/reset-password")
+@limiter.limit("20/minute")
+def admin_reset_student_password(
+    student_id: int, request: Request
+) -> dict[str, Any]:
+    """Reset a student's password to a temporary one."""
+    require_admin(request)
+    with get_db() as db:
+        student = db.query(Student).filter(Student.id == student_id).first()
+        if not student:
+            raise HTTPException(404, "Etudiant introuvable")
+        user = db.query(User).filter(User.id == student.user_id).first()
+        if not user:
+            raise HTTPException(404, "Utilisateur introuvable")
+        temp_password = f"icart{random.randint(1000, 9999)}"
+        user.password_hash = bcrypt.hashpw(
+            temp_password.encode(), bcrypt.gensalt()
+        ).decode()
+        db.commit()
+    return {
+        "status": "ok",
+        "temp_password": temp_password,
+        "message": f"Mot de passe reinitialise pour {student.first_name} {student.last_name}",
+    }
+
+
 @app.get("/api/admin/students/{student_id}/cv")
 def admin_serve_student_cv(student_id: int, request: Request) -> FileResponse:
     require_admin(request)

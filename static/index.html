@@ -2652,6 +2652,7 @@ function AdminStudents({ toast, setPage, setChatStudentId }) {
                                     { key: 'applications_count', label: 'Candidatures' },
                                     { key: null, label: 'Notes' },
                                     { key: null, label: 'Chat' },
+                                    { key: null, label: 'Actions' },
                                 ].map(({ key, label }) => {
                                     if (!key) return <th key={label}>{label}</th>;
                                     const idx = sortStack.findIndex((s) => s.key === key);
@@ -2693,6 +2694,20 @@ function AdminStudents({ toast, setPage, setChatStudentId }) {
                                     <td style={{ textAlign: 'center' }}>
                                         <button className="btn btn-outline btn-sm" style={{ padding: '4px 8px' }} onClick={() => openChatPage(s)} title="Ouvrir la messagerie" aria-label={`Messagerie avec ${sanitizeText(s.first_name || '')} ${sanitizeText(s.last_name || '')}`}>
                                             Ouvrir
+                                        </button>
+                                    </td>
+                                    <td style={{ textAlign: 'center' }}>
+                                        <button className="btn btn-outline btn-sm" style={{ padding: '3px 8px', fontSize: 11, color: '#D4742C', borderColor: '#D4742C' }} onClick={async () => {
+                                            if (!window.confirm(`Reinitialiser le mot de passe de ${s.first_name} ${s.last_name} ?`)) return;
+                                            try {
+                                                const r = await fetch(`/api/admin/students/${s.id}/reset-password`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } });
+                                                const d = await r.json();
+                                                if (r.ok) {
+                                                    window.prompt(`Nouveau mot de passe temporaire pour ${s.first_name} ${s.last_name} :\n(Copiez-le et transmettez-le a l'etudiant)`, d.temp_password);
+                                                } else { alert(d.detail || 'Erreur'); }
+                                            } catch(e) { alert('Erreur: ' + e.message); }
+                                        }} title="Reinitialiser le mot de passe">
+                                            Reset MDP
                                         </button>
                                     </td>
                                 </tr>
