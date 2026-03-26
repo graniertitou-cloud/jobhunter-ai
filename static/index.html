@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
     <title>ICART Stage Finder</title>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -45,16 +45,18 @@
 
         /* ===== Reset ===== */
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-        html { -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; }
+        html { -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; height: -webkit-fill-available; }
         body {
             font-family: var(--font-family);
             background: var(--color-bg);
             color: var(--color-text);
             min-height: 100vh;
+            min-height: -webkit-fill-available;
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
             line-height: 1.6;
             font-size: 14px;
+            overscroll-behavior: none;
         }
         /* Ensure all interactive elements respond to touch */
         a, button, input, select, textarea, [role="button"], .btn, .nav-item, .tab, .role-card, .student-option-btn, .back-btn, .logout-link, .hamburger, .job-card a, .msg-contact {
@@ -147,6 +149,7 @@
             border-bottom: 1px solid var(--color-border);
             z-index: 99;
             padding: 0 16px;
+            padding-top: env(safe-area-inset-top, 0px);
             align-items: center;
             justify-content: space-between;
         }
@@ -237,10 +240,13 @@
         /* ===== Login ===== */
         .login-container {
             min-height: 100vh;
+            min-height: -webkit-fill-available;
             display: flex;
             align-items: center;
             justify-content: center;
             background: linear-gradient(160deg, #FDF5F3 0%, #FAFAFA 40%, #F5F5F7 100%);
+            padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+            overflow-y: auto;
         }
         .login-inner { width: 100%; max-width: 460px; padding: 24px; }
         .login-brand { text-align: center; margin-bottom: 40px; }
@@ -859,9 +865,9 @@
         /* ===== Responsive Mobile ===== */
         @media (max-width: 768px) {
             .mobile-header { display: flex; }
-            .sidebar { transform: translateX(-100%); transition: transform 0.3s ease; pointer-events: none; }
-            .sidebar.open { transform: translateX(0); pointer-events: auto; }
-            .main-content { margin-left: 0; padding: 72px 12px 24px; max-width: 100%; }
+            .sidebar { transform: translateX(-100%); transition: transform 0.3s ease, visibility 0.3s ease; pointer-events: none; visibility: hidden; }
+            .sidebar.open { transform: translateX(0); pointer-events: auto; visibility: visible; }
+            .main-content { margin-left: 0; padding: calc(var(--mobile-header-height) + 16px) 12px 24px; max-width: 100%; }
 
             /* Login */
             .login-inner { padding: 16px; }
@@ -922,15 +928,27 @@
             .btn { font-size: 12px; padding: 8px 14px; }
             .btn-lg { font-size: 13px; padding: 10px 18px; }
 
-            /* Forms */
-            .form-input, .form-select, .form-textarea { font-size: 16px; } /* prevents iOS zoom */
-            input, select, textarea, button { font-size: 16px; }
+            /* Forms - iOS requires 16px font-size to prevent auto-zoom on focus */
+            .input, .select, .status-select,
+            input[type="text"], input[type="email"], input[type="password"], input[type="url"], input[type="search"],
+            select, textarea { font-size: 16px !important; }
 
-            /* Touch targets - min 44px */
-            .btn, .nav-item, .tab, .role-card, .student-option-btn, .back-btn, .logout-link {
+            /* Touch targets - min 44px for WCAG compliance */
+            .btn, .nav-item, .tab, .role-card, .student-option-btn, .back-btn, .logout-link,
+            .heart-btn, .filter-pill, .quick-action-link, .msg-contact, .hamburger, .found-stage-btn, .tab-add {
                 min-height: 44px;
             }
             a, button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+
+            /* Ensure role-cards are fully tappable on mobile */
+            .role-card { padding: 16px; min-height: 72px; }
+
+            /* Ensure modals work on mobile with safe area insets */
+            .modal-overlay { padding: 16px; padding-top: max(16px, env(safe-area-inset-top)); padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+            .modal { padding: 24px; max-height: 85vh; }
+
+            /* Fix messaging layout on mobile */
+            .messaging-layout { height: calc(100vh - var(--mobile-header-height) - 120px) !important; }
 
             /* Progress bars */
             .placement-row { flex-direction: column; gap: 4px; }
@@ -946,7 +964,7 @@
             .stat-card { padding: 12px 14px; }
             .login-brand h1 { font-size: 24px; }
             .login-form-card { padding: 20px 16px; }
-            .main-content { padding: 68px 8px 20px; }
+            .main-content { padding: calc(var(--mobile-header-height) + 12px) 8px 20px; }
             .spreadsheet-container { margin: 0 -8px; width: calc(100% + 16px); }
         }
     </style>
@@ -2839,7 +2857,7 @@ function AdminStudents({ toast, setPage, setChatStudentId }) {
                                         <button className="btn btn-outline btn-sm" style={{ padding: '3px 8px', fontSize: 11, color: '#D4742C', borderColor: '#D4742C' }} onClick={async () => {
                                             if (!window.confirm(`Reinitialiser le mot de passe de ${s.first_name} ${s.last_name} ?`)) return;
                                             try {
-                                                const r = await fetch(`/api/admin/students/${s.id}/reset-password`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } });
+                                                const r = await fetch(`/api/admin/students/${s.id}/reset-password`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + getToken() } });
                                                 const d = await r.json();
                                                 if (r.ok) {
                                                     window.prompt(`Nouveau mot de passe temporaire pour ${s.first_name} ${s.last_name} :\n(Copiez-le et transmettez-le a l'etudiant)`, d.temp_password);
