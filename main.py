@@ -2049,6 +2049,196 @@ def admin_get_messages(
         return [_serialize_message(m, student_user_id) for m in messages]
 
 
+@app.post("/api/admin/seed-fake-data")
+@limiter.limit("3/hour")
+def admin_seed_fake_data(request: Request) -> dict[str, Any]:
+    """Seed database with ~50 fake students per school for demo purposes."""
+    require_admin(request)
+
+    _FIRST_NAMES = [
+        "Emma", "Louise", "Alice", "Chloe", "Lea", "Manon", "Camille", "Jade",
+        "Lina", "Sarah", "Juliette", "Clara", "Margaux", "Ines", "Anna",
+        "Marie", "Lucie", "Charlotte", "Zoe", "Eva", "Romane", "Agathe",
+        "Mathilde", "Victoria", "Elsa", "Noemie", "Hugo", "Lucas", "Gabriel",
+        "Louis", "Raphael", "Arthur", "Jules", "Adam", "Mael", "Leo",
+        "Nathan", "Paul", "Tom", "Ethan", "Theo", "Maxime", "Alexandre",
+        "Antoine", "Valentin", "Baptiste", "Clement", "Oscar", "Samuel",
+        "Axel", "Romain", "Victor", "Simon", "Adrien", "Bastien", "Florian",
+        "Dylan", "Tristan", "Nolan", "Quentin", "Damien", "Eliot", "Gabin",
+        "Liam", "Mathis", "Robin", "Martin", "Enzo", "Noah", "Eliott",
+        "Margot", "Pauline", "Oceane", "Anais", "Apolline", "Capucine",
+        "Celeste", "Diane", "Elena", "Faustine", "Gabrielle", "Helene",
+        "Iris", "Jeanne", "Lola", "Madeleine", "Nina", "Olivia", "Penelope",
+        "Rose", "Sophie", "Victoire", "Yasmine", "Ambre", "Blanche",
+        "Constance", "Doriane", "Emilie", "Flora", "Garance",
+    ]
+    _LAST_NAMES = [
+        "Martin", "Bernard", "Dubois", "Thomas", "Robert", "Richard", "Petit",
+        "Durand", "Leroy", "Moreau", "Simon", "Laurent", "Lefebvre", "Michel",
+        "Garcia", "David", "Bertrand", "Roux", "Vincent", "Fournier",
+        "Morel", "Girard", "Andre", "Mercier", "Dupont", "Lambert", "Bonnet",
+        "Francois", "Martinez", "Legrand", "Garnier", "Faure", "Rousseau",
+        "Blanc", "Guerin", "Muller", "Henry", "Roussel", "Nicolas", "Perrin",
+        "Morin", "Mathieu", "Clement", "Gauthier", "Dumont", "Lopez",
+        "Fontaine", "Chevalier", "Robin", "Masson", "Sanchez", "Noel",
+        "Dufour", "Blanchard", "Brunet", "Giraud", "Riviere", "Arnaud",
+        "Collet", "Lemoine", "Marchand", "Picard", "Renard", "Barbier",
+    ]
+    _SECTORS = [
+        "Arts visuels & Mediation", "Musique & Spectacle vivant",
+        "Cinema & Audiovisuel", "Mode & Luxe", "Communication & Digital",
+        "Marche de l'art", "Patrimoine & Museologie",
+    ]
+    _PROMOS = ["Bachelor 1", "Bachelor 2", "Bachelor 3", "MBA 1", "MBA 2"]
+    _COMPANIES = [
+        "Musee du Louvre", "Centre Pompidou", "Palais de Tokyo",
+        "Fondation Louis Vuitton", "Musee d'Orsay", "Grand Palais",
+        "Galerie Perrotin", "Christie's Paris", "Sotheby's France",
+        "Artcurial", "LVMH", "Kering", "Chanel", "Dior Couture",
+        "Hermes International", "Balenciaga", "Saint Laurent Paris",
+        "Canal+", "France Televisions", "Arte", "Gaumont", "Pathe",
+        "Philharmonie de Paris", "Opera de Paris", "Theatre du Chatelet",
+        "Publicis", "Havas", "BETC", "Galeries Lafayette", "Le Bon Marche",
+    ]
+    _JOB_TITLES = [
+        "Assistant curateur", "Charge de production culturelle",
+        "Assistant communication musee", "Coordinateur evenementiel",
+        "Assistant galerie d'art", "Charge de mediation culturelle",
+        "Assistant marketing luxe", "Coordinateur artistique",
+        "Assistant production audiovisuelle", "Charge de relations presse",
+        "Community manager culture", "Assistant commissaire d'exposition",
+        "Charge de programmation", "Assistant direction artistique",
+        "Coordinateur projets culturels", "Assistant patrimoine",
+    ]
+    _STATUSES = ["a_envoyer", "envoyee", "relance", "entretien", "refusee", "obtenu"]
+    _MSG_ADMIN = [
+        "Bonjour, comment avancent vos recherches de stage ?",
+        "N'hesitez pas a postuler sur les offres que je vous ai envoyees.",
+        "Votre CV est bien recu, je le transmets a mon reseau.",
+        "Avez-vous eu des retours suite a vos candidatures ?",
+        "Pensez a relancer les entreprises ou vous avez postule.",
+        "Bravo pour votre entretien ! Tenez-moi au courant.",
+    ]
+    _MSG_STUDENT = [
+        "Merci pour l'offre, je vais postuler !",
+        "J'ai envoye ma candidature ce matin.",
+        "J'ai un entretien prevu la semaine prochaine !",
+        "Malheureusement je n'ai pas ete retenu(e).",
+        "J'ai trouve mon stage, merci pour votre aide !",
+        "Je cherche encore, mais j'ai quelques pistes.",
+    ]
+
+    random.seed(42)
+    with get_db() as db:
+        existing = db.query(Student).count()
+        if existing > 10:
+            return {"status": "skip", "message": f"Deja {existing} etudiants en base."}
+
+        admin = db.query(User).filter(User.role == "admin").first()
+        if not admin:
+            raise HTTPException(400, "Aucun admin trouve")
+
+        schools = db.query(School).all()
+        if not schools:
+            raise HTTPException(400, "Aucune ecole trouvee")
+
+        now = datetime.utcnow()
+        count = 0
+
+        # Create fake jobs
+        job_ids = []
+        for i in range(40):
+            job = Job(
+                title=random.choice(_JOB_TITLES),
+                company=random.choice(_COMPANIES),
+                location=random.choice(["Paris", "Paris 8e", "Paris 3e", "Bordeaux", "Lyon"]),
+                url=f"https://example.com/job/{i+1}",
+                platform=random.choice(["LinkedIn", "WTTJ", "France Travail", "Profilculture"]),
+                sector=random.choice(_SECTORS),
+                description=f"Stage dans le secteur culturel.",
+                contract_type=random.choice(["Stage", "Alternance"]),
+                score=round(random.uniform(60, 95), 1),
+                scraped_at=now - timedelta(days=random.randint(0, 30)),
+            )
+            db.add(job)
+            db.flush()
+            job_ids.append(job.id)
+
+        used_emails: set[str] = set()
+        used_names: set[tuple[str, str]] = set()
+
+        for school in schools:
+            for _ in range(random.randint(45, 55)):
+                while True:
+                    fn = random.choice(_FIRST_NAMES)
+                    ln = random.choice(_LAST_NAMES)
+                    if (fn, ln) not in used_names:
+                        used_names.add((fn, ln))
+                        break
+
+                email = f"{fn.lower()}.{ln.lower()}@icart.fr"
+                suffix = 1
+                while email in used_emails:
+                    email = f"{fn.lower()}.{ln.lower()}{suffix}@icart.fr"
+                    suffix += 1
+                used_emails.add(email)
+
+                is_found = random.random() < 0.30
+                hashed = bcrypt.hashpw("icart2025".encode(), bcrypt.gensalt()).decode()
+                user = User(
+                    email=email, password_hash=hashed, role="student",
+                    first_name=fn, last_name=ln,
+                )
+                db.add(user)
+                db.flush()
+
+                last_activity = now - timedelta(hours=random.randint(0, 72), minutes=random.randint(0, 59))
+                student = Student(
+                    user_id=user.id, first_name=fn, last_name=ln,
+                    promo=random.choice(_PROMOS), school_id=school.id,
+                    target_sector=random.choice(_SECTORS),
+                    stage_status="found" if is_found else "searching",
+                    stage_company=random.choice(_COMPANIES) if is_found else "",
+                    domain_found=random.choice(_SECTORS) if is_found else "",
+                    last_activity_at=last_activity,
+                    notes=random.choice(["", "", "", "Tres motive.", "A besoin d'aide pour son CV.", "Bilingue anglais."]),
+                )
+                db.add(student)
+                db.flush()
+
+                # Applications
+                for a in range(random.randint(1, 6)):
+                    app_status = "obtenu" if (is_found and a == 0) else random.choice(_STATUSES)
+                    applied_date = now - timedelta(days=random.randint(0, 45))
+                    db.add(Application(
+                        student_id=student.id, job_title=random.choice(_JOB_TITLES),
+                        company=random.choice(_COMPANIES),
+                        url=f"https://example.com/apply/{random.randint(1000, 9999)}",
+                        status=app_status, notes="",
+                        applied_at=applied_date,
+                        updated_at=applied_date + timedelta(days=random.randint(0, 10)),
+                    ))
+
+                # Saved jobs
+                for jid in random.sample(job_ids, min(random.randint(0, 5), len(job_ids))):
+                    db.add(SavedJob(student_id=student.id, job_id=jid, saved_at=now - timedelta(days=random.randint(0, 20))))
+
+                # Messages
+                for _ in range(random.randint(0, 8)):
+                    msg_time = now - timedelta(days=random.randint(0, 30), hours=random.randint(0, 23))
+                    if random.random() < 0.5:
+                        db.add(Message(from_user_id=admin.id, to_student_id=student.id,
+                                       content=random.choice(_MSG_ADMIN), sent_at=msg_time, read=1 if random.random() < 0.7 else 0))
+                    else:
+                        db.add(Message(from_user_id=user.id, to_student_id=student.id,
+                                       content=random.choice(_MSG_STUDENT), sent_at=msg_time, read=1 if random.random() < 0.8 else 0))
+
+                count += 1
+
+        db.commit()
+        return {"status": "ok", "message": f"{count} etudiants crees dans {len(schools)} ecoles."}
+
+
 @app.get("/api/student/messages")
 def student_get_messages(request: Request) -> list[dict[str, Any]]:
     user = require_student(request)

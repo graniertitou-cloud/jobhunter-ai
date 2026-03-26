@@ -2301,6 +2301,19 @@ function AdminDashboard({ toast, setPage }) {
                 <button className="quick-action-link" onClick={() => setPage('messages')}>
                     Messagerie <Icon.ArrowRight />
                 </button>
+                {stats && stats.total === 0 && (
+                    <button className="quick-action-link" style={{color:'#D4742C'}} onClick={async () => {
+                        if (!window.confirm('Generer ~150 etudiants fictifs pour la demo ?')) return;
+                        try {
+                            const r = await fetch('/api/admin/seed-fake-data', {method:'POST', headers:{'Authorization':'Bearer '+token}});
+                            const d = await r.json();
+                            alert(d.message || d.detail);
+                            window.location.reload();
+                        } catch(e) { alert('Erreur: '+e.message); }
+                    }}>
+                        Generer des donnees demo <Icon.ArrowRight />
+                    </button>
+                )}
             </div>
         </section>
     );
