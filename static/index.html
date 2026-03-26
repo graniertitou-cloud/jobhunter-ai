@@ -2305,7 +2305,7 @@ function AdminDashboard({ toast, setPage }) {
                     <button className="quick-action-link" style={{color:'#D4742C'}} onClick={async () => {
                         if (!window.confirm('Generer ~150 etudiants fictifs pour la demo ?')) return;
                         try {
-                            const r = await fetch('/api/admin/seed-fake-data', {method:'POST', headers:{'Authorization':'Bearer '+token}});
+                            const r = await fetch('/api/admin/seed-fake-data', {method:'POST', headers:{'Authorization':'Bearer '+getToken()}});
                             const d = await r.json();
                             alert(d.message || d.detail);
                             window.location.reload();
