@@ -825,22 +825,98 @@
         @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* ===== Responsive ===== */
+        /* ===== Responsive Tablet ===== */
+        @media (max-width: 1024px) {
+            .stats-row { grid-template-columns: repeat(2, 1fr) !important; }
+            .job-cards { grid-template-columns: 1fr 1fr; }
+            .search-form .form-group { min-width: 140px; }
+        }
+
+        /* ===== Responsive Mobile ===== */
         @media (max-width: 768px) {
             .mobile-header { display: flex; }
             .sidebar { transform: translateX(-100%); transition: transform 0.3s ease; }
             .sidebar.open { transform: translateX(0); }
-            .main-content { margin-left: 0; padding: 72px 16px 24px; }
+            .main-content { margin-left: 0; padding: 72px 12px 24px; max-width: 100%; }
+
+            /* Login */
+            .login-inner { padding: 16px; }
+            .login-brand h1 { font-size: 28px; }
+            .login-brand p { font-size: 14px; }
+            .login-brand { margin-bottom: 24px; }
+            .login-form-card { padding: 24px 20px; border-radius: 12px; }
+            .login-form-card h2 { font-size: 18px; }
+            .login-footer { margin-top: 24px; }
             .role-cards { grid-template-columns: 1fr; }
-            .search-form { flex-direction: column; }
+
+            /* Stats */
+            .stats-row { grid-template-columns: 1fr 1fr !important; gap: 10px; margin-bottom: 20px; }
+            .stat-card { padding: 14px 16px; }
+            .stat-card .stat-number { font-size: 24px; }
+            .stat-card .stat-label { font-size: 10px; }
+
+            /* Titles */
+            .page-title { font-size: 20px; }
+            .page-subtitle { font-size: 13px; }
+            .page-title-group { margin-bottom: 20px; }
+
+            /* Search form */
+            .search-form { flex-direction: column; gap: 10px; }
             .search-form .form-group { min-width: unset; }
-            .job-cards { grid-template-columns: 1fr; }
-            .stats-row { grid-template-columns: 1fr 1fr; }
-            .grid-2 { grid-template-columns: 1fr; }
-            .messaging-layout { flex-direction: column; height: auto; }
+
+            /* Job cards */
+            .job-cards { grid-template-columns: 1fr; gap: 12px; }
+            .job-card { padding: 16px; }
+            .job-card h3 { font-size: 13px; }
+            .job-card .job-company { font-size: 12px; }
+            .job-card .job-actions { flex-direction: column; }
+            .job-card .job-actions .btn { width: 100%; justify-content: center; }
+
+            /* Messaging */
+            .messaging-layout { flex-direction: column; height: auto; min-height: 70vh; }
             .msg-contacts { width: 100%; max-height: 200px; border-right: none; border-bottom: 1px solid var(--color-border); }
-            .page-title { font-size: 22px; }
-            .main-content { max-width: 100%; }
+            .msg-chat { min-height: 400px; }
+            .msg-input-row { flex-direction: column; }
+            .msg-input-row .btn { width: 100%; }
+
+            /* Spreadsheet - horizontal scroll */
+            .spreadsheet-container { border-radius: 8px; margin: 0 -12px; width: calc(100% + 24px); }
+            .spreadsheet th, .spreadsheet td { padding: 8px 10px; font-size: 11px; white-space: nowrap; }
+
+            /* Tabs */
+            .tabs { gap: 0; }
+            .tab { padding: 8px 12px; font-size: 12px; }
+
+            /* Cards & grids */
+            .grid-2 { grid-template-columns: 1fr; }
+            .card { padding: 16px; border-radius: 10px; }
+
+            /* Tracking table */
+            .tracking-table th, .tracking-table td { padding: 8px 10px; font-size: 12px; }
+
+            /* Buttons */
+            .btn { font-size: 12px; padding: 8px 14px; }
+            .btn-lg { font-size: 13px; padding: 10px 18px; }
+
+            /* Forms */
+            .form-input, .form-select, .form-textarea { font-size: 16px; } /* prevents iOS zoom */
+
+            /* Progress bars */
+            .placement-row { flex-direction: column; gap: 4px; }
+            .placement-row > span:first-child { min-width: unset; }
+
+            /* Toast */
+            .toast-container { left: 12px; right: 12px; bottom: 12px; }
+        }
+
+        /* ===== Responsive Very Small ===== */
+        @media (max-width: 400px) {
+            .stats-row { grid-template-columns: 1fr !important; }
+            .stat-card { padding: 12px 14px; }
+            .login-brand h1 { font-size: 24px; }
+            .login-form-card { padding: 20px 16px; }
+            .main-content { padding: 68px 8px 20px; }
+            .spreadsheet-container { margin: 0 -8px; width: calc(100% + 16px); }
         }
     </style>
 </head>
