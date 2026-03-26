@@ -45,6 +45,7 @@
 
         /* ===== Reset ===== */
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        html { -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; }
         body {
             font-family: var(--font-family);
             background: var(--color-bg);
@@ -54,6 +55,7 @@
             -moz-osx-font-smoothing: grayscale;
             line-height: 1.6;
             font-size: 14px;
+            touch-action: manipulation;
         }
 
         /* ===== Layout ===== */
@@ -269,6 +271,10 @@
             display: flex;
             align-items: flex-start;
             gap: 14px;
+            width: 100%;
+            font-family: inherit;
+            -webkit-appearance: none;
+            appearance: none;
         }
         .role-card:hover {
             border-color: var(--color-primary);
@@ -900,6 +906,13 @@
 
             /* Forms */
             .form-input, .form-select, .form-textarea { font-size: 16px; } /* prevents iOS zoom */
+            input, select, textarea, button { font-size: 16px; }
+
+            /* Touch targets - min 44px */
+            .btn, .nav-item, .tab, .role-card, .student-option-btn, .back-btn, .logout-link {
+                min-height: 44px;
+            }
+            a, button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 
             /* Progress bars */
             .placement-row { flex-direction: column; gap: 4px; }
@@ -1188,20 +1201,20 @@ function LoginPage({ onLogin, toast }) {
                             <p>Stage Finder</p>
                         </header>
                         <div className="role-cards" role="group" aria-label="Choisir votre espace">
-                            <div className="role-card" role="button" tabIndex={0} onClick={() => { resetForm(); setView('admin-login'); }} onKeyDown={(e) => e.key === 'Enter' && (resetForm(), setView('admin-login'))}>
+                            <button type="button" className="role-card" onClick={() => { resetForm(); setView('admin-login'); }}>
                                 <div className="role-icon"><Icon.Admin /></div>
-                                <div>
+                                <div style={{ textAlign: 'left' }}>
                                     <h2>Espace Administration</h2>
                                     <p>Gestion et suivi des promotions</p>
                                 </div>
-                            </div>
-                            <div className="role-card" role="button" tabIndex={0} onClick={() => { resetForm(); setView('student-choose'); }} onKeyDown={(e) => e.key === 'Enter' && (resetForm(), setView('student-choose'))}>
+                            </button>
+                            <button type="button" className="role-card" onClick={() => { resetForm(); setView('student-choose'); }}>
                                 <div className="role-icon"><Icon.Student /></div>
-                                <div>
+                                <div style={{ textAlign: 'left' }}>
                                     <h2>Espace Etudiant</h2>
                                     <p>Recherche de stage et candidatures</p>
                                 </div>
-                            </div>
+                            </button>
                         </div>
                         <p className="login-footer">Developpe pour faciliter l'insertion professionnelle des etudiants ICART</p>
                     </div>
