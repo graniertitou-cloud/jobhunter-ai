@@ -381,6 +381,18 @@
             letter-spacing: 0.04em;
         }
 
+        .password-wrapper { position: relative; }
+        .password-wrapper .input { padding-right: 44px; }
+        .password-toggle {
+            position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+            background: none; border: none; cursor: pointer; padding: 8px;
+            color: var(--color-text-muted); display: flex; align-items: center; justify-content: center;
+            min-width: 36px; min-height: 36px; border-radius: 6px;
+            -webkit-tap-highlight-color: rgba(0,0,0,0.05); touch-action: manipulation;
+        }
+        .password-toggle:hover { color: var(--color-text-secondary); }
+        .password-toggle svg { width: 18px; height: 18px; }
+
         .input, .select {
             width: 100%;
             padding: 10px 14px;
@@ -1167,6 +1179,13 @@ function LoginPage({ onLogin, toast }) {
     const [lastName, setLastName] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [showPw, setShowPw] = useState(false);
+
+    const EyeIcon = () => showPw ? (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+    ) : (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+    );
 
     const resetForm = useCallback(() => {
         setEmail('');
@@ -1270,11 +1289,14 @@ function LoginPage({ onLogin, toast }) {
                         <form onSubmit={(e) => handleLogin(e, 'admin')} noValidate>
                             <div className="form-group">
                                 <label htmlFor="admin-email">Adresse email</label>
-                                <input id="admin-email" className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="admin@icart.fr" required maxLength={254} autoComplete="email" />
+                                <input id="admin-email" className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value.trim().toLowerCase())} placeholder="admin@icart.fr" required maxLength={254} autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck="false" />
                             </div>
                             <div className="form-group">
                                 <label htmlFor="admin-password">Mot de passe</label>
-                                <input id="admin-password" className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Votre mot de passe" required maxLength={128} autoComplete="current-password" />
+                                <div className="password-wrapper">
+                                    <input id="admin-password" className="input" type={showPw ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Votre mot de passe" required maxLength={128} autoComplete="current-password" autoCapitalize="none" autoCorrect="off" spellCheck="false" />
+                                    <button type="button" className="password-toggle" onClick={() => setShowPw(!showPw)} tabIndex={-1} aria-label={showPw ? 'Masquer' : 'Afficher'}><EyeIcon /></button>
+                                </div>
                             </div>
                             <button className="btn btn-primary btn-full" type="submit" disabled={loading}>
                                 {loading ? 'Connexion...' : 'Se connecter'}
@@ -1312,11 +1334,14 @@ function LoginPage({ onLogin, toast }) {
                         <form onSubmit={(e) => handleLogin(e, 'student')} noValidate>
                             <div className="form-group">
                                 <label htmlFor="student-email">Adresse email</label>
-                                <input id="student-email" className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="prenom@email.com" required maxLength={254} autoComplete="email" />
+                                <input id="student-email" className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value.trim().toLowerCase())} placeholder="prenom@email.com" required maxLength={254} autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck="false" />
                             </div>
                             <div className="form-group">
                                 <label htmlFor="student-password">Mot de passe</label>
-                                <input id="student-password" className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Votre mot de passe" required maxLength={128} autoComplete="current-password" />
+                                <div className="password-wrapper">
+                                    <input id="student-password" className="input" type={showPw ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Votre mot de passe" required maxLength={128} autoComplete="current-password" autoCapitalize="none" autoCorrect="off" spellCheck="false" />
+                                    <button type="button" className="password-toggle" onClick={() => setShowPw(!showPw)} tabIndex={-1} aria-label={showPw ? 'Masquer' : 'Afficher'}><EyeIcon /></button>
+                                </div>
                             </div>
                             <button className="btn btn-primary btn-full" type="submit" disabled={loading}>
                                 {loading ? 'Connexion...' : 'Se connecter'}
@@ -1344,11 +1369,14 @@ function LoginPage({ onLogin, toast }) {
                             </div>
                             <div className="form-group">
                                 <label htmlFor="register-email">Adresse email</label>
-                                <input id="register-email" className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="prenom@email.com" required maxLength={254} autoComplete="email" />
+                                <input id="register-email" className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value.trim().toLowerCase())} placeholder="prenom@email.com" required maxLength={254} autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck="false" />
                             </div>
                             <div className="form-group">
                                 <label htmlFor="register-password">Mot de passe</label>
-                                <input id="register-password" className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Minimum 8 caracteres" minLength={8} maxLength={128} required autoComplete="new-password" style={password.length > 0 && password.length < 8 ? { borderColor: 'var(--color-danger)', boxShadow: '0 0 0 2px rgba(220,38,38,0.1)' } : password.length >= 8 ? { borderColor: 'var(--color-success)', boxShadow: '0 0 0 2px rgba(22,163,74,0.1)' } : {}} />
+                                <div className="password-wrapper">
+                                    <input id="register-password" className="input" type={showPw ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Minimum 8 caracteres" minLength={8} maxLength={128} required autoComplete="new-password" autoCapitalize="none" autoCorrect="off" spellCheck="false" style={password.length > 0 && password.length < 8 ? { borderColor: 'var(--color-danger)', boxShadow: '0 0 0 2px rgba(220,38,38,0.1)' } : password.length >= 8 ? { borderColor: 'var(--color-success)', boxShadow: '0 0 0 2px rgba(22,163,74,0.1)' } : {}} />
+                                    <button type="button" className="password-toggle" onClick={() => setShowPw(!showPw)} tabIndex={-1} aria-label={showPw ? 'Masquer' : 'Afficher'}><EyeIcon /></button>
+                                </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
                                     <div style={{ flex: 1, height: 4, borderRadius: 2, background: '#e5e7eb', overflow: 'hidden' }}>
                                         <div style={{ height: '100%', borderRadius: 2, width: `${Math.min(100, (password.length / 8) * 100)}%`, background: password.length >= 8 ? 'var(--color-success)' : password.length >= 4 ? '#f59e0b' : '#ef4444', transition: 'all 0.3s ease' }} />

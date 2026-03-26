@@ -1030,7 +1030,7 @@ def register(req: RegisterRequest, request: Request) -> dict[str, Any]:
 
 
 @app.post("/api/auth/login")
-@limiter.limit("5/minute")
+@limiter.limit("15/minute")
 def login(req: LoginRequest, request: Request) -> dict[str, Any]:
     dummy_hash = hash_password("dummy_password_for_timing")
 
