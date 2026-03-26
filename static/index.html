@@ -2301,7 +2301,7 @@ function AdminDashboard({ toast, setPage }) {
                 <button className="quick-action-link" onClick={() => setPage('messages')}>
                     Messagerie <Icon.ArrowRight />
                 </button>
-                {stats && stats.total === 0 && (
+                {totals.totalStudents === 0 && (
                     <button className="quick-action-link" style={{color:'#D4742C'}} onClick={async () => {
                         if (!window.confirm('Generer ~150 etudiants fictifs pour la demo ?')) return;
                         try {
