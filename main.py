@@ -1674,6 +1674,21 @@ def admin_students(request: Request) -> list[dict[str, Any]]:
             ):
                 app_counts[sid] = cnt
 
+        # Unread message counts (messages from students, not yet read)
+        unread_counts: dict[int, int] = {}
+        if student_ids:
+            student_user_ids = {s.id: s.user_id for s in students}
+            for sid, cnt in (
+                db.query(Message.to_student_id, func.count(Message.id))
+                .filter(
+                    Message.to_student_id.in_(student_ids),
+                    Message.read == 0,
+                )
+                .group_by(Message.to_student_id)
+                .all()
+            ):
+                unread_counts[sid] = cnt
+
         result = []
         for s in students:
             u = users_by_id.get(s.user_id)
@@ -1698,6 +1713,7 @@ def admin_students(request: Request) -> list[dict[str, Any]]:
                     s.last_activity_at.isoformat() if s.last_activity_at else None
                 ),
                 "notes": s.notes or "",
+                "unread_count": unread_counts.get(s.id, 0),
             })
         return result
 
@@ -2073,6 +2089,40 @@ def admin_get_messages(
             .all()
         )
         return [_serialize_message(m, student_user_id) for m in messages]
+
+
+@app.patch("/api/admin/messages/{student_id}/read")
+@limiter.limit("30/minute")
+def admin_toggle_read(student_id: int, request: Request) -> dict[str, Any]:
+    """Toggle all messages for a student between read/unread."""
+    require_admin(request)
+    with get_db() as db:
+        student = db.query(Student).filter(Student.id == student_id).first()
+        if not student:
+            raise HTTPException(404, "Etudiant introuvable")
+        # Check if there are unread messages from student
+        unread = db.query(Message).filter(
+            Message.to_student_id == student_id,
+            Message.from_user_id == student.user_id,
+            Message.read == 0,
+        ).count()
+        if unread > 0:
+            # Mark all as read
+            db.query(Message).filter(
+                Message.to_student_id == student_id,
+                Message.from_user_id == student.user_id,
+                Message.read == 0,
+            ).update({"read": 1})
+            new_status = "read"
+        else:
+            # Mark all from student as unread
+            db.query(Message).filter(
+                Message.to_student_id == student_id,
+                Message.from_user_id == student.user_id,
+            ).update({"read": 0})
+            new_status = "unread"
+        db.commit()
+    return {"status": "ok", "new_status": new_status}
 
 
 @app.post("/api/admin/seed-fake-data")

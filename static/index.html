@@ -2764,9 +2764,10 @@ function AdminMessages({ toast, initialStudentId }) {
     const [loadingMessages, setLoadingMessages] = useState(false);
     const [text, setText] = useState('');
     const [sending, setSending] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
     const chatBodyRef = useRef(null);
 
-    useEffect(() => {
+    const fetchStudents = useCallback(() => {
         api('/api/admin/students')
             .then((d) => {
                 const list = Array.isArray(d) ? d : d.students || [];
@@ -2776,6 +2777,8 @@ function AdminMessages({ toast, initialStudentId }) {
             .catch((err) => toast(err.message, 'error'))
             .finally(() => setLoadingStudents(false));
     }, []);
+
+    useEffect(() => { fetchStudents(); }, [fetchStudents]);
 
     const fetchMessages = useCallback((sid) => {
         if (!sid) return;
@@ -2804,12 +2807,35 @@ function AdminMessages({ toast, initialStudentId }) {
             });
             setText('');
             fetchMessages(selectedId);
+            // Move this student to top of list
+            setStudents(prev => {
+                const idx = prev.findIndex(s => s.id === selectedId);
+                if (idx <= 0) return prev;
+                const copy = [...prev];
+                const [moved] = copy.splice(idx, 1);
+                copy.unshift(moved);
+                return copy;
+            });
         } catch (err) {
             toast(err.message, 'error');
         } finally {
             setSending(false);
         }
     }, [text, selectedId, toast, fetchMessages]);
+
+    const toggleRead = useCallback(async (studentId, e) => {
+        e.stopPropagation();
+        try {
+            const d = await api(`/api/admin/messages/${studentId}/read`, { method: 'PATCH' });
+            setStudents(prev => prev.map(s => {
+                if (s.id !== studentId) return s;
+                return { ...s, unread_count: d.new_status === 'unread' ? 1 : 0 };
+            }));
+            toast(d.new_status === 'read' ? 'Marque comme lu' : 'Marque comme non lu');
+        } catch (err) {
+            toast(err.message, 'error');
+        }
+    }, [toast]);
 
     const handleKeyDown = useCallback((e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -2823,6 +2849,17 @@ function AdminMessages({ toast, initialStudentId }) {
         [students, selectedId]
     );
 
+    const filteredStudents = useMemo(() => {
+        if (!searchQuery.trim()) return students;
+        const q = searchQuery.toLowerCase();
+        return students.filter(s =>
+            (s.first_name || '').toLowerCase().includes(q) ||
+            (s.last_name || '').toLowerCase().includes(q) ||
+            (`${s.first_name} ${s.last_name}`).toLowerCase().includes(q) ||
+            (s.email || '').toLowerCase().includes(q)
+        );
+    }, [students, searchQuery]);
+
     return (
         <section className="fade-in">
             <div className="page-title-group">
@@ -2831,8 +2868,18 @@ function AdminMessages({ toast, initialStudentId }) {
             </div>
             <div className="messaging-layout">
                 <nav className="msg-contacts" aria-label="Liste des etudiants">
+                    <div style={{ padding: '8px 10px', borderBottom: '1px solid var(--color-border)' }}>
+                        <input
+                            className="input"
+                            type="text"
+                            placeholder="Rechercher un etudiant..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            style={{ fontSize: 13, padding: '6px 10px' }}
+                        />
+                    </div>
                     {loadingStudents ? <Spinner /> : (
-                        students.map((s) => (
+                        filteredStudents.map((s) => (
                             <div
                                 key={s.id}
                                 className={`msg-contact${selectedId === s.id ? ' active' : ''}`}
@@ -2842,13 +2889,25 @@ function AdminMessages({ toast, initialStudentId }) {
                                 onKeyDown={(e) => e.key === 'Enter' && setSelectedId(s.id)}
                                 aria-label={`${sanitizeText(s.first_name || '')} ${sanitizeText(s.last_name || '')}`}
                             >
-                                <div className="msg-contact-avatar" aria-hidden="true">
+                                <div className="msg-contact-avatar" aria-hidden="true" style={{ position: 'relative' }}>
                                     {(s.first_name || '?')[0]}{(s.last_name || '?')[0]}
+                                    {(s.unread_count || 0) > 0 && (
+                                        <span style={{ position: 'absolute', top: -2, right: -2, width: 10, height: 10, borderRadius: '50%', background: '#D4742C', border: '2px solid #fff' }} />
+                                    )}
                                 </div>
-                                <div className="msg-contact-info">
-                                    <div className="msg-contact-name">{sanitizeText(s.first_name || '')} {sanitizeText(s.last_name || '')}</div>
+                                <div className="msg-contact-info" style={{ flex: 1 }}>
+                                    <div className="msg-contact-name" style={{ fontWeight: (s.unread_count || 0) > 0 ? 700 : 500 }}>
+                                        {sanitizeText(s.first_name || '')} {sanitizeText(s.last_name || '')}
+                                    </div>
                                     <div className="msg-contact-preview">{sanitizeText(s.email || '')}</div>
                                 </div>
+                                <button
+                                    onClick={(e) => toggleRead(s.id, e)}
+                                    title={(s.unread_count || 0) > 0 ? 'Marquer comme lu' : 'Marquer comme non lu'}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, fontSize: 16, color: (s.unread_count || 0) > 0 ? '#D4742C' : 'var(--color-text-faint)' }}
+                                >
+                                    {(s.unread_count || 0) > 0 ? '●' : '○'}
+                                </button>
                             </div>
                         ))
                     )}
