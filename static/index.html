@@ -1,0 +1,2980 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ICART Stage Finder</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* ===== Custom Properties ===== */
+        :root {
+            --color-primary: #D4742C;
+            --color-primary-hover: #B8621F;
+            --color-primary-light: #FEF7F0;
+            --color-primary-subtle: #FCEEE1;
+            --color-success: #16a34a;
+            --color-success-hover: #15803d;
+            --color-success-light: #dcfce7;
+            --color-danger: #dc2626;
+            --color-danger-hover: #b91c1c;
+            --color-danger-light: #fee2e2;
+            --color-warning: #d97706;
+            --color-purple: #7c3aed;
+            --color-purple-light: #f3e8ff;
+            --color-blue: #2563eb;
+            --color-blue-light: #dbeafe;
+            --color-heading: #1B1B1F;
+            --color-text: #2D2D32;
+            --color-text-secondary: #5A5A65;
+            --color-text-muted: #8A8A96;
+            --color-text-placeholder: #B0B0BA;
+            --color-text-faint: #D1D1D8;
+            --color-bg: #F7F7F9;
+            --color-surface: #FFFFFF;
+            --color-border: #E8E8ED;
+            --color-border-light: #F2F2F5;
+            --color-bg-hover: #FAFAFB;
+            --color-bg-subtle: #F2F2F5;
+            --sidebar-width: 248px;
+            --mobile-header-height: 56px;
+            --font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        /* ===== Reset ===== */
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: var(--font-family);
+            background: var(--color-bg);
+            color: var(--color-text);
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            line-height: 1.6;
+            font-size: 14px;
+        }
+
+        /* ===== Layout ===== */
+        .app-layout { display: flex; min-height: 100vh; }
+
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--color-surface);
+            border-right: 1px solid var(--color-border);
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            inset: 0 auto 0 0;
+            z-index: 100;
+        }
+
+        .sidebar-logo {
+            padding: 24px 24px 20px;
+            border-bottom: 1px solid var(--color-border);
+        }
+        .sidebar-logo h1 {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--color-primary);
+            letter-spacing: -0.02em;
+        }
+        .sidebar-logo span {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--color-text-muted);
+            display: block;
+            margin-top: 2px;
+            letter-spacing: 0.01em;
+        }
+
+        .sidebar-nav { flex: 1; padding: 12px 8px; overflow-y: auto; }
+
+        .sidebar-footer {
+            padding: 16px 20px;
+            border-top: 1px solid var(--color-border);
+        }
+        .sidebar-footer .user-email {
+            font-size: 11px;
+            color: var(--color-text-muted);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: block;
+            margin-top: 8px;
+        }
+        .sidebar-footer .logout-link {
+            background: none;
+            border: none;
+            color: var(--color-text-muted);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            font-family: inherit;
+            padding: 0;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: color 0.2s ease;
+        }
+        .sidebar-footer .logout-link:hover { color: var(--color-danger); }
+        .sidebar-footer .logout-link svg { width: 14px; height: 14px; }
+
+        .main-content {
+            margin-left: var(--sidebar-width);
+            flex: 1;
+            padding: 40px 48px;
+            min-height: 100vh;
+            max-width: 1200px;
+        }
+
+        /* ===== Mobile Header ===== */
+        .mobile-header {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            height: var(--mobile-header-height);
+            background: var(--color-surface);
+            border-bottom: 1px solid var(--color-border);
+            z-index: 99;
+            padding: 0 16px;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .mobile-header h1 { font-size: 16px; font-weight: 700; color: var(--color-primary); letter-spacing: -0.02em; }
+
+        .hamburger {
+            background: none; border: none; cursor: pointer; padding: 8px;
+            display: flex; align-items: center; justify-content: center;
+            min-width: 44px; min-height: 44px;
+        }
+        .hamburger svg { width: 22px; height: 22px; color: var(--color-text-secondary); }
+
+        .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.25); z-index: 99; }
+        .sidebar-overlay.open { display: block; }
+
+        /* ===== Navigation ===== */
+        .nav-item {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 9px 16px;
+            color: var(--color-text-secondary);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+            font-family: inherit;
+            min-height: 40px;
+            border-radius: 8px;
+            margin-bottom: 2px;
+            border-left: 3px solid transparent;
+        }
+        .nav-item:hover { background: var(--color-bg-subtle); color: var(--color-text); }
+        .nav-item:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+        .nav-item.active {
+            background: var(--color-primary-light);
+            color: var(--color-primary);
+            font-weight: 600;
+            border-left-color: var(--color-primary);
+        }
+        .nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
+
+        .nav-badge {
+            background: var(--color-danger);
+            color: #fff;
+            border-radius: 9999px;
+            font-size: 10px;
+            font-weight: 700;
+            min-width: 18px;
+            height: 18px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 5px;
+        }
+
+        /* ===== Page Headers ===== */
+        .page-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--color-heading);
+            letter-spacing: -0.02em;
+            line-height: 1.2;
+        }
+        .page-subtitle {
+            font-size: 15px;
+            color: var(--color-text-muted);
+            margin-top: 4px;
+            font-weight: 400;
+        }
+        .page-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 32px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .page-header .page-title { margin-bottom: 0; }
+        .page-title-group { margin-bottom: 32px; }
+        .page-title-group .page-title { margin-bottom: 0; }
+
+        /* ===== Login ===== */
+        .login-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(160deg, #FEF7F0 0%, var(--color-bg) 40%, #F0F0F8 100%);
+        }
+        .login-inner { width: 100%; max-width: 460px; padding: 24px; }
+        .login-brand { text-align: center; margin-bottom: 40px; }
+        .login-brand h1 {
+            font-size: 38px;
+            font-weight: 700;
+            color: var(--color-primary);
+            letter-spacing: -0.03em;
+            line-height: 1;
+        }
+        .login-brand p {
+            font-size: 16px;
+            color: var(--color-text-muted);
+            margin-top: 6px;
+            font-weight: 400;
+            letter-spacing: 0.02em;
+        }
+        .login-footer {
+            text-align: center;
+            margin-top: 40px;
+            font-size: 12px;
+            color: var(--color-text-muted);
+            line-height: 1.5;
+        }
+
+        .role-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .role-card {
+            background: var(--color-surface);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: left;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 1.5px solid var(--color-border);
+            display: flex;
+            align-items: flex-start;
+            gap: 14px;
+        }
+        .role-card:hover {
+            border-color: var(--color-primary);
+            box-shadow: 0 4px 16px rgba(212, 116, 44, 0.08);
+        }
+        .role-card:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+        .role-card .role-icon {
+            width: 40px; height: 40px;
+            border-radius: 10px;
+            background: var(--color-primary-light);
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+        .role-card .role-icon svg { width: 20px; height: 20px; color: var(--color-primary); }
+        .role-card h2 { font-size: 15px; font-weight: 600; color: var(--color-heading); margin-bottom: 2px; letter-spacing: -0.01em; }
+        .role-card p { font-size: 12px; color: var(--color-text-muted); line-height: 1.4; }
+
+        .login-form-card {
+            background: var(--color-surface);
+            border-radius: 16px;
+            padding: 36px;
+            width: 100%;
+            max-width: 420px;
+            border: 1px solid var(--color-border);
+            box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+            margin: 0 auto;
+        }
+        .login-form-card h2 {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--color-heading);
+            text-align: center;
+            margin-bottom: 4px;
+            letter-spacing: -0.02em;
+        }
+        .login-form-card .subtitle {
+            font-size: 13px;
+            color: var(--color-text-muted);
+            text-align: center;
+            margin-bottom: 28px;
+        }
+
+        .back-btn {
+            display: inline-flex; align-items: center; gap: 4px;
+            background: none; border: none;
+            color: var(--color-text-muted);
+            font-size: 13px; font-weight: 500;
+            cursor: pointer;
+            margin-bottom: 20px;
+            font-family: inherit;
+            min-height: 36px;
+            transition: color 0.15s ease;
+        }
+        .back-btn:hover { color: var(--color-primary); }
+        .back-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+
+        .student-options { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+        .student-option-btn {
+            padding: 10px 20px; border-radius: 8px;
+            font-size: 13px; font-weight: 600;
+            cursor: pointer; transition: all 0.2s ease;
+            font-family: inherit; text-align: center;
+            min-height: 42px;
+        }
+        .student-option-btn.primary {
+            background: var(--color-primary); color: #fff; border: none;
+            box-shadow: 0 1px 2px rgba(212, 116, 44, 0.3);
+        }
+        .student-option-btn.primary:hover { background: var(--color-primary-hover); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(212, 116, 44, 0.25); }
+        .student-option-btn.outline { background: none; border: 1.5px solid var(--color-border); color: var(--color-text-secondary); }
+        .student-option-btn.outline:hover { border-color: var(--color-primary); color: var(--color-primary); background: var(--color-primary-light); }
+
+        /* ===== Form Elements ===== */
+        .form-group { margin-bottom: 20px; }
+        .form-group label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--color-text-secondary);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .input, .select {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1.5px solid var(--color-border);
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            transition: all 0.2s ease;
+            outline: none;
+            background: #fff;
+            color: var(--color-text);
+        }
+        .input:focus, .select:focus {
+            border-color: var(--color-primary);
+            box-shadow: 0 0 0 3px rgba(212, 116, 44, 0.08);
+        }
+        .input::placeholder { color: var(--color-text-placeholder); }
+
+        .error-msg { color: var(--color-danger); font-size: 13px; margin-top: 12px; text-align: center; font-weight: 500; }
+
+        /* ===== Buttons ===== */
+        .btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+            padding: 10px 20px; border-radius: 8px; font-size: 13px; font-weight: 600;
+            font-family: inherit; cursor: pointer; transition: all 0.2s ease;
+            border: none; letter-spacing: 0.01em;
+        }
+        .btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+        .btn svg { width: 16px; height: 16px; }
+
+        .btn-primary {
+            background: var(--color-primary); color: #fff;
+            box-shadow: 0 1px 2px rgba(212, 116, 44, 0.3);
+        }
+        .btn-primary:hover { background: var(--color-primary-hover); box-shadow: 0 4px 12px rgba(212, 116, 44, 0.25); transform: translateY(-1px); }
+        .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
+
+        .btn-outline {
+            background: transparent; border: 1.5px solid var(--color-border);
+            color: var(--color-text-secondary);
+        }
+        .btn-outline:hover { border-color: var(--color-primary); color: var(--color-primary); background: var(--color-primary-light); }
+
+        .btn-danger { background: var(--color-danger); color: #fff; }
+        .btn-danger:hover { background: var(--color-danger-hover); }
+        .btn-success { background: var(--color-success); color: #fff; }
+        .btn-success:hover { background: var(--color-success-hover); }
+
+        .btn-full { width: 100%; }
+        .btn-sm { padding: 6px 14px; font-size: 12px; }
+        .btn-lg { padding: 12px 28px; font-size: 14px; }
+
+        .heart-btn {
+            background: none; border: none; cursor: pointer;
+            font-size: 18px; color: var(--color-text-faint);
+            transition: color 0.2s ease; padding: 4px;
+            min-width: 36px; min-height: 36px;
+            display: inline-flex; align-items: center; justify-content: center;
+        }
+        .heart-btn.saved { color: var(--color-danger); }
+        .heart-btn:hover { color: var(--color-danger); }
+
+        .found-stage-btn {
+            background: var(--color-success); color: #fff;
+            padding: 10px 24px; border-radius: 8px; border: none;
+            font-size: 13px; font-weight: 600; cursor: pointer;
+            font-family: inherit; transition: all 0.2s ease;
+            display: inline-flex; align-items: center; gap: 8px;
+            box-shadow: 0 1px 2px rgba(22, 163, 74, 0.3);
+        }
+        .found-stage-btn:hover { background: var(--color-success-hover); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(22, 163, 74, 0.25); }
+        .found-stage-btn:focus-visible { outline: 2px solid var(--color-success); outline-offset: 2px; }
+
+        /* ===== Toast ===== */
+        .toast-container {
+            position: fixed; top: 20px; right: 20px; z-index: 9999;
+            display: flex; flex-direction: column; gap: 8px;
+        }
+        .toast {
+            padding: 10px 18px; border-radius: 8px; font-size: 13px; font-weight: 500;
+            color: #fff; animation: slideIn 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+        }
+        .toast[role="status"] { background: #059669; }
+        .toast[role="alert"] { background: var(--color-danger); }
+
+        /* ===== Cards ===== */
+        .card {
+            background: var(--color-surface);
+            border-radius: 12px;
+            border: 1px solid var(--color-border);
+            padding: 24px;
+            margin-bottom: 20px;
+            transition: all 0.2s ease;
+        }
+        .card-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--color-heading);
+            margin-bottom: 4px;
+            letter-spacing: -0.01em;
+        }
+        .card-subtitle { font-size: 13px; color: var(--color-text-muted); margin-bottom: 16px; }
+
+        /* ===== Stats ===== */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+        .stat-card {
+            background: var(--color-surface);
+            border-radius: 12px;
+            padding: 20px 24px;
+            border: 1px solid var(--color-border);
+            position: relative;
+            overflow: hidden;
+        }
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            left: 0; top: 0; bottom: 0;
+            width: 3px;
+            background: var(--color-border);
+        }
+        .stat-card .stat-number {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--color-heading);
+            letter-spacing: -0.02em;
+            line-height: 1;
+        }
+        .stat-card .stat-label {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--color-text-muted);
+            margin-top: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .stat-card.green::before { background: var(--color-success); }
+        .stat-card.green .stat-number { color: var(--color-success); }
+        .stat-card.orange::before { background: var(--color-primary); }
+        .stat-card.orange .stat-number { color: var(--color-primary); }
+
+        .stat-badge {
+            display: flex; flex-direction: column; align-items: center;
+            padding: 10px 16px; border-radius: 8px;
+            font-size: 12px; font-weight: 500; min-width: 80px;
+        }
+        .stat-badge .stat-num { font-size: 22px; font-weight: 700; margin-bottom: 2px; letter-spacing: -0.02em; }
+        .stat-badge.gray { background: var(--color-bg-subtle); color: var(--color-text-secondary); }
+        .stat-badge.green { background: #f0fdf4; color: var(--color-success); }
+        .stat-badge.orange { background: var(--color-primary-light); color: var(--color-primary); }
+
+        /* Filter pills */
+        .filter-pill {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 500;
+            border: 1px solid var(--color-border); background: #fff; color: var(--color-text-secondary);
+            cursor: pointer; transition: all 0.2s ease; white-space: nowrap;
+        }
+        .filter-pill:hover { background: var(--color-bg-subtle); }
+        .filter-pill.active { background: var(--color-text); color: #fff; border-color: var(--color-text); }
+        .filter-pill.green.active { background: var(--color-success); border-color: var(--color-success); }
+        .filter-pill.orange.active { background: var(--color-primary); border-color: var(--color-primary); }
+        .filter-count {
+            display: inline-flex; align-items: center; justify-content: center;
+            min-width: 20px; height: 20px; border-radius: 10px; font-size: 11px; font-weight: 600;
+            background: rgba(0,0,0,0.08); padding: 0 5px;
+        }
+        .filter-pill.active .filter-count { background: rgba(255,255,255,0.25); color: #fff; }
+
+        /* Sortable headers */
+        th.sortable { cursor: pointer; user-select: none; white-space: nowrap; transition: color 0.15s; }
+        th.sortable:hover { color: var(--color-primary); }
+        .sort-indicator { font-size: 11px; opacity: 0.4; }
+        .sort-indicator.active { opacity: 1; color: var(--color-primary); font-weight: 600; }
+        .sort-rank {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 14px; height: 14px; border-radius: 50%; background: var(--color-primary);
+            color: #fff; font-size: 9px; font-weight: 700; margin-left: 2px; vertical-align: middle;
+        }
+
+        /* ===== Tabs ===== */
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid var(--color-border);
+            margin-bottom: 24px;
+            overflow-x: auto;
+            gap: 4px;
+        }
+        .tab {
+            padding: 10px 16px; font-size: 13px; font-weight: 500;
+            color: var(--color-text-muted); cursor: pointer;
+            border: none; background: none; font-family: inherit;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px; transition: all 0.15s ease;
+            white-space: nowrap; min-height: 40px;
+        }
+        .tab:hover { color: var(--color-text); }
+        .tab:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+        .tab.active { color: var(--color-primary); border-bottom-color: var(--color-primary); font-weight: 600; }
+
+        .tab-add {
+            padding: 10px 12px; font-size: 16px; font-weight: 500;
+            color: var(--color-text-muted); cursor: pointer;
+            border: none; background: none; margin-bottom: -1px;
+            transition: color 0.15s ease; min-width: 40px; min-height: 40px;
+        }
+        .tab-add:hover { color: var(--color-primary); }
+
+        /* ===== Job Cards ===== */
+        .job-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+        .job-card {
+            background: var(--color-surface);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid var(--color-border);
+            display: flex; flex-direction: column; gap: 10px;
+            transition: all 0.2s ease;
+        }
+        .job-card:hover { border-color: var(--color-primary-subtle); box-shadow: 0 4px 16px rgba(0,0,0,0.04); }
+        .job-card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+        .job-card h3 { font-size: 14px; font-weight: 600; color: var(--color-heading); letter-spacing: -0.01em; }
+        .job-card .job-company { font-size: 13px; color: var(--color-text-secondary); margin-top: 2px; }
+        .job-card .job-location { font-size: 12px; color: var(--color-text-muted); }
+        .job-card .job-desc { font-size: 13px; color: var(--color-text-secondary); line-height: 1.5; flex: 1; }
+        .job-card .job-badges { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+        .job-card .job-actions { display: flex; gap: 8px; margin-top: auto; flex-wrap: wrap; align-items: center; }
+
+        /* ===== Badges ===== */
+        .platform-badge {
+            display: inline-block; padding: 2px 8px; border-radius: 4px;
+            font-size: 10px; font-weight: 600;
+            background: var(--color-primary-light); color: var(--color-primary);
+            text-transform: uppercase; letter-spacing: 0.04em;
+        }
+        .contract-badge {
+            display: inline-block; padding: 2px 8px; border-radius: 4px;
+            font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+        }
+        .contract-badge.stage { background: var(--color-primary-light); color: var(--color-primary); }
+        .contract-badge.alternance { background: var(--color-purple-light); color: var(--color-purple); }
+
+        .tracking-status {
+            display: inline-block; padding: 3px 10px;
+            border-radius: 9999px; font-size: 11px; font-weight: 600;
+        }
+        .tracking-status.a_envoyer { background: var(--color-bg-subtle); color: var(--color-text-muted); }
+        .tracking-status.envoye { background: var(--color-blue-light); color: var(--color-blue); }
+        .tracking-status.relance { background: var(--color-primary-light); color: var(--color-primary); }
+        .tracking-status.entretien { background: var(--color-purple-light); color: var(--color-purple); }
+        .tracking-status.refuse { background: var(--color-danger-light); color: var(--color-danger); }
+        .tracking-status.accepte { background: var(--color-success-light); color: var(--color-success); }
+
+        /* ===== Search Form ===== */
+        .search-form { display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; align-items: flex-end; }
+        .search-form .form-group { margin-bottom: 0; min-width: 180px; flex: 1; }
+        .search-form .form-group.keyword { flex: 2; }
+
+        /* ===== Tracking Table ===== */
+        .tracking-table {
+            width: 100%; border-collapse: collapse;
+            background: var(--color-surface);
+            border-radius: 12px; overflow: hidden;
+            border: 1px solid var(--color-border);
+        }
+        .tracking-table th {
+            background: #FAFAFA; text-align: left;
+            padding: 12px 16px; font-size: 11px; font-weight: 600;
+            color: var(--color-text-muted);
+            text-transform: uppercase; letter-spacing: 0.05em;
+            border-bottom: 1px solid var(--color-border);
+        }
+        .tracking-table td {
+            padding: 12px 16px; font-size: 13px;
+            color: var(--color-text-secondary);
+            border-top: 1px solid var(--color-border-light);
+        }
+        .tracking-table tr:hover td { background: var(--color-bg-hover); }
+
+        .status-select {
+            padding: 4px 8px; border-radius: 6px;
+            border: 1.5px solid var(--color-border);
+            font-size: 12px; font-family: inherit;
+            cursor: pointer; outline: none; min-height: 32px;
+            background: #fff;
+        }
+        .status-select:focus { border-color: var(--color-primary); }
+
+        /* ===== Spreadsheet ===== */
+        .spreadsheet-container { overflow-x: auto; border-radius: 12px; border: 1px solid var(--color-border); }
+        .spreadsheet { width: 100%; border-collapse: collapse; }
+        .spreadsheet th {
+            position: sticky; top: 0;
+            background: #FAFAFA;
+            color: var(--color-text-muted);
+            padding: 10px 14px; font-size: 11px; font-weight: 600;
+            text-align: left; text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid var(--color-border);
+            white-space: nowrap; z-index: 10;
+        }
+        .spreadsheet td {
+            padding: 10px 14px; font-size: 13px;
+            border-bottom: 1px solid var(--color-border-light);
+            cursor: default; min-width: 100px;
+        }
+        .spreadsheet tr:hover td { background: var(--color-bg-hover); }
+        .spreadsheet td.editing { padding: 0; border: 2px solid var(--color-primary); }
+        .spreadsheet td.editing input,
+        .spreadsheet td.editing select {
+            width: 100%; padding: 8px 12px; border: none; outline: none;
+            font-size: 13px; font-family: inherit; background: var(--color-surface);
+        }
+
+        /* ===== CV Upload ===== */
+        .cv-upload-area {
+            border: 2px dashed var(--color-border);
+            border-radius: 12px; padding: 32px;
+            text-align: center; cursor: pointer;
+            transition: all 0.2s ease; margin-bottom: 16px;
+        }
+        .cv-upload-area:hover,
+        .cv-upload-area.dragging {
+            border-color: var(--color-primary);
+            background: var(--color-primary-light);
+        }
+        .cv-upload-area svg { width: 32px; height: 32px; color: var(--color-text-placeholder); margin-bottom: 8px; }
+        .cv-upload-area p { font-size: 14px; color: var(--color-text-muted); }
+        .cv-upload-area .hint { font-size: 12px; color: var(--color-text-placeholder); margin-top: 4px; }
+
+        /* ===== Modal ===== */
+        .modal-overlay {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.35); z-index: 1000;
+            display: flex; align-items: center; justify-content: center;
+            padding: 16px;
+        }
+        .modal {
+            background: var(--color-surface);
+            border-radius: 16px; padding: 32px;
+            width: 100%; max-width: 480px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.12);
+            max-height: 90vh; overflow-y: auto;
+        }
+        .modal h2 { font-size: 18px; font-weight: 700; color: var(--color-heading); margin-bottom: 20px; letter-spacing: -0.02em; }
+
+        /* ===== Messaging ===== */
+        .messaging-layout {
+            display: flex;
+            height: calc(100vh - 140px);
+            background: var(--color-surface);
+            border-radius: 12px;
+            border: 1px solid var(--color-border);
+            overflow: hidden;
+        }
+        .msg-contacts { width: 280px; border-right: 1px solid var(--color-border); overflow-y: auto; }
+        .msg-contact {
+            display: flex; align-items: center; gap: 12px;
+            padding: 14px 16px; cursor: pointer;
+            border-bottom: 1px solid var(--color-border-light);
+            transition: background 0.15s ease; min-height: 44px;
+        }
+        .msg-contact:hover { background: var(--color-bg-hover); }
+        .msg-contact.active { background: var(--color-primary-light); }
+        .msg-contact-info { flex: 1; min-width: 0; }
+        .msg-contact-name { font-size: 13px; font-weight: 600; color: var(--color-heading); }
+        .msg-contact-preview {
+            font-size: 12px; color: var(--color-text-muted);
+            white-space: nowrap; overflow: hidden;
+            text-overflow: ellipsis; max-width: 180px;
+        }
+        .msg-contact-avatar {
+            width: 36px; height: 36px; border-radius: 50%;
+            background: var(--color-primary-light);
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 600; font-size: 12px;
+            color: var(--color-primary); flex-shrink: 0;
+            text-transform: uppercase;
+        }
+        .msg-chat { flex: 1; display: flex; flex-direction: column; }
+        .msg-chat-header {
+            padding: 16px 20px; border-bottom: 1px solid var(--color-border);
+            font-weight: 600; font-size: 14px; color: var(--color-heading);
+        }
+        .msg-chat-body { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 8px; }
+        .msg-bubble {
+            max-width: 65%; padding: 10px 14px;
+            border-radius: 14px; font-size: 14px; line-height: 1.5;
+        }
+        .msg-bubble.sent {
+            align-self: flex-end;
+            background: var(--color-primary); color: #fff;
+            border-bottom-right-radius: 4px;
+        }
+        .msg-bubble.received {
+            align-self: flex-start;
+            background: var(--color-bg-subtle); color: var(--color-text);
+            border-bottom-left-radius: 4px;
+        }
+        .msg-bubble-time { font-size: 10px; opacity: 0.6; margin-top: 4px; }
+        .msg-input-area { display: flex; gap: 8px; padding: 16px 20px; border-top: 1px solid var(--color-border); }
+        .msg-input-area input { flex: 1; }
+        .msg-empty { display: flex; align-items: center; justify-content: center; flex: 1; color: var(--color-text-placeholder); font-size: 14px; }
+
+        /* ===== Bar Chart ===== */
+        .bar-chart { display: flex; flex-direction: column; gap: 12px; }
+        .bar-chart-row { display: flex; align-items: center; gap: 12px; }
+        .bar-chart-label {
+            width: 140px; font-size: 13px; font-weight: 500;
+            color: var(--color-text-secondary);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .bar-chart-track {
+            flex: 1; height: 24px;
+            background: var(--color-bg-subtle);
+            border-radius: 6px; position: relative; overflow: hidden;
+        }
+        .bar-chart-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--color-primary), var(--color-warning));
+            border-radius: 6px;
+            display: flex; align-items: center; justify-content: flex-end;
+            padding-right: 8px;
+            font-size: 11px; font-weight: 600; color: #fff;
+            min-width: 30px; transition: width 0.5s ease;
+        }
+
+        /* ===== Quick Actions ===== */
+        .quick-actions { display: flex; gap: 16px; flex-wrap: wrap; }
+        .quick-action-link {
+            font-size: 13px; font-weight: 500;
+            color: var(--color-text-secondary);
+            cursor: pointer; background: none; border: none;
+            font-family: inherit; padding: 0;
+            transition: color 0.15s ease;
+            display: inline-flex; align-items: center; gap: 4px;
+        }
+        .quick-action-link:hover { color: var(--color-primary); }
+
+        /* ===== Utilities ===== */
+        .spinner { display: flex; align-items: center; justify-content: center; padding: 48px; }
+        .spinner::after {
+            content: ''; width: 28px; height: 28px; border-radius: 50%;
+            border: 2.5px solid var(--color-border);
+            border-top-color: var(--color-primary);
+            animation: spin 0.7s linear infinite;
+        }
+
+        .empty-state {
+            text-align: center; padding: 64px 24px;
+            color: var(--color-text-muted); font-size: 14px;
+            line-height: 1.6;
+        }
+        .fade-in { animation: fadeIn 0.3s ease; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .flex-row { display: flex; gap: 8px; }
+        .flex-row > * { flex: 1; }
+        .flex-center { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .text-center { text-align: center; }
+        .mt-24 { margin-top: 24px; }
+        .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+
+        /* ===== Animations ===== */
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* ===== Responsive ===== */
+        @media (max-width: 768px) {
+            .mobile-header { display: flex; }
+            .sidebar { transform: translateX(-100%); transition: transform 0.3s ease; }
+            .sidebar.open { transform: translateX(0); }
+            .main-content { margin-left: 0; padding: 72px 16px 24px; }
+            .role-cards { grid-template-columns: 1fr; }
+            .search-form { flex-direction: column; }
+            .search-form .form-group { min-width: unset; }
+            .job-cards { grid-template-columns: 1fr; }
+            .stats-row { grid-template-columns: 1fr 1fr; }
+            .grid-2 { grid-template-columns: 1fr; }
+            .messaging-layout { flex-direction: column; height: auto; }
+            .msg-contacts { width: 100%; max-height: 200px; border-right: none; border-bottom: 1px solid var(--color-border); }
+            .page-title { font-size: 22px; }
+            .main-content { max-width: 100%; }
+        }
+    </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useCallback, useRef, useMemo } = React;
+
+/* ===== Constants ===== */
+
+const SECTORS = [
+    'Arts visuels & Mediation', 'Musique & Spectacle vivant', 'Cinema & Audiovisuel',
+    'Mode & Luxe', 'Communication & Digital', 'Marche de l\'art', 'Patrimoine & Museologie',
+];
+
+const TRACKING_STATUSES = [
+    { value: 'a_envoyer', label: 'A postuler' },
+    { value: 'envoye', label: 'Candidature envoyee' },
+    { value: 'relance', label: 'Relance effectuee' },
+    { value: 'entretien', label: 'Entretien programme' },
+    { value: 'refuse', label: 'Refuse' },
+    { value: 'accepte', label: 'Stage obtenu' },
+];
+
+/* ===== Icons ===== */
+
+const ICON_PROPS = { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' };
+const ICON_SMALL = { ...ICON_PROPS, style: { width: 16, height: 16 } };
+
+const Icon = {
+    Dashboard: () => (
+        <svg {...ICON_PROPS}><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    ),
+    Briefcase: () => (
+        <svg {...ICON_PROPS}><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+    ),
+    Search: () => (
+        <svg {...ICON_PROPS}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    ),
+    Users: () => (
+        <svg {...ICON_PROPS}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    ),
+    User: () => (
+        <svg {...ICON_PROPS}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+    ),
+    ClipboardList: () => (
+        <svg {...ICON_PROPS}><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg>
+    ),
+    Upload: () => (
+        <svg {...ICON_PROPS}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+    ),
+    Menu: () => (
+        <svg {...ICON_PROPS}><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    ),
+    Plus: () => (
+        <svg {...ICON_PROPS}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    ),
+    Trash: () => (
+        <svg {...ICON_PROPS}><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+    ),
+    Logout: () => (
+        <svg {...ICON_PROPS}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+    ),
+    Admin: () => (
+        <svg {...ICON_PROPS}><path d="M12 15v2"/><path d="M6 11V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v6"/><rect x="2" y="11" width="20" height="11" rx="2"/></svg>
+    ),
+    Student: () => (
+        <svg {...ICON_PROPS}><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c0 2 2 3 6 3s6-1 6-3v-5"/></svg>
+    ),
+    Back: () => (
+        <svg {...ICON_SMALL}><polyline points="15 18 9 12 15 6"/></svg>
+    ),
+    Eye: () => (
+        <svg {...ICON_SMALL}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+    ),
+    Heart: ({ filled }) => filled
+        ? <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>,
+    Check: () => (
+        <svg {...ICON_PROPS} style={{ width: 18, height: 18 }}><polyline points="20 6 9 17 4 12"/></svg>
+    ),
+    Message: () => (
+        <svg {...ICON_PROPS}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+    ),
+    ArrowRight: () => (
+        <svg {...ICON_SMALL}><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+    ),
+};
+
+/* ===== Auth Helpers ===== */
+
+function getToken() { return localStorage.getItem('icart_token') || ''; }
+function setToken(t) { localStorage.setItem('icart_token', t); }
+function setUserData(u) { localStorage.setItem('icart_user', JSON.stringify(u)); }
+function getUserData() {
+    try { return JSON.parse(localStorage.getItem('icart_user')); }
+    catch { return null; }
+}
+function clearAuth() {
+    localStorage.removeItem('icart_token');
+    localStorage.removeItem('icart_user');
+}
+
+/* ===== API Helper ===== */
+
+async function api(path, options = {}) {
+    const headers = { Authorization: `Bearer ${getToken()}`, ...(options.headers || {}) };
+    if (!(options.body instanceof FormData)) {
+        headers['Content-Type'] = 'application/json';
+    }
+    const res = await fetch(path, { ...options, headers });
+    if (res.status === 401) {
+        clearAuth();
+        window.location.reload();
+        throw new Error('Session expiree');
+    }
+    if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        throw new Error(
+            typeof e.detail === 'string' && e.detail.length < 200 ? e.detail : 'Erreur serveur'
+        );
+    }
+    return res.json();
+}
+
+/* ===== Utility Functions ===== */
+
+function truncate(str, len) {
+    if (!str) return '';
+    return str.length > len ? str.substring(0, len) + '...' : str;
+}
+
+function relativeTime(dateStr) {
+    if (!dateStr) return '-';
+    const d = new Date(dateStr);
+    const mins = Math.floor((Date.now() - d.getTime()) / 60000);
+    if (mins < 1) return "A l'instant";
+    if (mins < 60) return `Il y a ${mins} min`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `Il y a ${hours}h`;
+    return d.toLocaleDateString('fr-FR');
+}
+
+function safeHref(url) {
+    if (!url) return '#';
+    try {
+        const parsed = new URL(url, window.location.origin);
+        if (parsed.protocol === 'http:' || parsed.protocol === 'https:') return url;
+    } catch { /* invalid URL */ }
+    return '#';
+}
+
+function sanitizeText(text) {
+    if (!text) return '';
+    return String(text);
+}
+
+/* ===== Shared UI Components ===== */
+
+function ToastContainer({ toasts }) {
+    return (
+        <div className="toast-container" aria-live="polite">
+            {toasts.map((t) => (
+                <div key={t.id} className="toast" role={t.type === 'error' ? 'alert' : 'status'}>
+                    {sanitizeText(t.msg)}
+                </div>
+            ))}
+        </div>
+    );
+}
+
+function Spinner() {
+    return <div className="spinner" role="status" aria-label="Chargement"></div>;
+}
+
+function EmptyState({ children }) {
+    return <div className="empty-state">{children}</div>;
+}
+
+function Modal({ onClose, children }) {
+    return (
+        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={onClose}>
+            <div className="modal" onClick={(e) => e.stopPropagation()}>
+                {children}
+            </div>
+        </div>
+    );
+}
+
+/* ===== Login Page ===== */
+
+function LoginPage({ onLogin, toast }) {
+    const [view, setView] = useState('choose');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [firstName, setFirstName] = useState('');
+    const [lastName, setLastName] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    const resetForm = useCallback(() => {
+        setEmail('');
+        setPassword('');
+        setFirstName('');
+        setLastName('');
+        setError('');
+    }, []);
+
+    const goBack = useCallback((target) => {
+        resetForm();
+        setView(target);
+    }, [resetForm]);
+
+    const handleLogin = useCallback(async (e, role) => {
+        e.preventDefault();
+        setError('');
+        setLoading(true);
+        try {
+            const data = await api('/api/auth/login', {
+                method: 'POST',
+                body: JSON.stringify({ email, password, expected_role: role }),
+            });
+            setToken(data.token);
+            setUserData(data.user);
+            onLogin(data.user);
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    }, [email, password, onLogin]);
+
+    const handleRegister = useCallback(async (e) => {
+        e.preventDefault();
+        setError('');
+        if (password.length < 8) {
+            setError('Le mot de passe doit contenir au moins 8 caracteres');
+            return;
+        }
+        setLoading(true);
+        try {
+            const data = await api('/api/auth/register', {
+                method: 'POST',
+                body: JSON.stringify({
+                    first_name: firstName,
+                    last_name: lastName,
+                    email,
+                    password,
+                    role: 'student',
+                }),
+            });
+            setToken(data.token);
+            setUserData(data.user);
+            onLogin(data.user);
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    }, [firstName, lastName, email, password, onLogin]);
+
+    return (
+        <main className="login-container">
+            <div className="login-inner fade-in">
+                {view === 'choose' && (
+                    <div>
+                        <header className="login-brand">
+                            <h1>ICART</h1>
+                            <p>Stage Finder</p>
+                        </header>
+                        <div className="role-cards" role="group" aria-label="Choisir votre espace">
+                            <div className="role-card" role="button" tabIndex={0} onClick={() => { resetForm(); setView('admin-login'); }} onKeyDown={(e) => e.key === 'Enter' && (resetForm(), setView('admin-login'))}>
+                                <div className="role-icon"><Icon.Admin /></div>
+                                <div>
+                                    <h2>Espace Administration</h2>
+                                    <p>Gestion et suivi des promotions</p>
+                                </div>
+                            </div>
+                            <div className="role-card" role="button" tabIndex={0} onClick={() => { resetForm(); setView('student-choose'); }} onKeyDown={(e) => e.key === 'Enter' && (resetForm(), setView('student-choose'))}>
+                                <div className="role-icon"><Icon.Student /></div>
+                                <div>
+                                    <h2>Espace Etudiant</h2>
+                                    <p>Recherche de stage et candidatures</p>
+                                </div>
+                            </div>
+                        </div>
+                        <p className="login-footer">Developpe pour faciliter l'insertion professionnelle des etudiants ICART</p>
+                    </div>
+                )}
+
+                {view === 'admin-login' && (
+                    <div className="login-form-card fade-in">
+                        <button className="back-btn" onClick={() => goBack('choose')} aria-label="Retour au choix du role">
+                            <Icon.Back /> Retour
+                        </button>
+                        <h2>Espace Administration</h2>
+                        <p className="subtitle">Acces reserve aux charges de relations entreprises</p>
+                        <form onSubmit={(e) => handleLogin(e, 'admin')} noValidate>
+                            <div className="form-group">
+                                <label htmlFor="admin-email">Adresse email</label>
+                                <input id="admin-email" className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="admin@icart.fr" required maxLength={254} autoComplete="email" />
+                            </div>
+                            <div className="form-group">
+                                <label htmlFor="admin-password">Mot de passe</label>
+                                <input id="admin-password" className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Votre mot de passe" required maxLength={128} autoComplete="current-password" />
+                            </div>
+                            <button className="btn btn-primary btn-full" type="submit" disabled={loading}>
+                                {loading ? 'Connexion...' : 'Se connecter'}
+                            </button>
+                            {error && <p className="error-msg" role="alert">{sanitizeText(error)}</p>}
+                        </form>
+                    </div>
+                )}
+
+                {view === 'student-choose' && (
+                    <div className="login-form-card fade-in">
+                        <button className="back-btn" onClick={() => goBack('choose')} aria-label="Retour au choix du role">
+                            <Icon.Back /> Retour
+                        </button>
+                        <h2>Espace Etudiant</h2>
+                        <p className="subtitle">Connectez-vous ou creez votre compte</p>
+                        <div className="student-options">
+                            <button className="student-option-btn primary" onClick={() => { resetForm(); setView('student-login'); }}>
+                                Se connecter
+                            </button>
+                            <button className="student-option-btn outline" onClick={() => { resetForm(); setView('student-register'); }}>
+                                Creer un compte
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {view === 'student-login' && (
+                    <div className="login-form-card fade-in">
+                        <button className="back-btn" onClick={() => goBack('student-choose')} aria-label="Retour a l'espace etudiant">
+                            <Icon.Back /> Retour
+                        </button>
+                        <h2>Connexion Etudiant</h2>
+                        <p className="subtitle">Retrouvez vos offres et candidatures</p>
+                        <form onSubmit={(e) => handleLogin(e, 'student')} noValidate>
+                            <div className="form-group">
+                                <label htmlFor="student-email">Adresse email</label>
+                                <input id="student-email" className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="prenom@email.com" required maxLength={254} autoComplete="email" />
+                            </div>
+                            <div className="form-group">
+                                <label htmlFor="student-password">Mot de passe</label>
+                                <input id="student-password" className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Votre mot de passe" required maxLength={128} autoComplete="current-password" />
+                            </div>
+                            <button className="btn btn-primary btn-full" type="submit" disabled={loading}>
+                                {loading ? 'Connexion...' : 'Se connecter'}
+                            </button>
+                            {error && <p className="error-msg" role="alert">{sanitizeText(error)}</p>}
+                        </form>
+                    </div>
+                )}
+
+                {view === 'student-register' && (
+                    <div className="login-form-card fade-in">
+                        <button className="back-btn" onClick={() => goBack('student-choose')} aria-label="Retour a l'espace etudiant">
+                            <Icon.Back /> Retour
+                        </button>
+                        <h2>Creer mon compte</h2>
+                        <p className="subtitle">Rejoignez la communaute ICART Stage Finder</p>
+                        <form onSubmit={handleRegister} noValidate>
+                            <div className="form-group">
+                                <label htmlFor="register-firstname">Prenom</label>
+                                <input id="register-firstname" className="input" type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Votre prenom" required maxLength={100} autoComplete="given-name" />
+                            </div>
+                            <div className="form-group">
+                                <label htmlFor="register-lastname">Nom</label>
+                                <input id="register-lastname" className="input" type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Votre nom" required maxLength={100} autoComplete="family-name" />
+                            </div>
+                            <div className="form-group">
+                                <label htmlFor="register-email">Adresse email</label>
+                                <input id="register-email" className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="prenom@email.com" required maxLength={254} autoComplete="email" />
+                            </div>
+                            <div className="form-group">
+                                <label htmlFor="register-password">Mot de passe</label>
+                                <input id="register-password" className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Minimum 8 caracteres" minLength={8} maxLength={128} required autoComplete="new-password" style={password.length > 0 && password.length < 8 ? { borderColor: 'var(--color-danger)', boxShadow: '0 0 0 2px rgba(220,38,38,0.1)' } : password.length >= 8 ? { borderColor: 'var(--color-success)', boxShadow: '0 0 0 2px rgba(22,163,74,0.1)' } : {}} />
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                                    <div style={{ flex: 1, height: 4, borderRadius: 2, background: '#e5e7eb', overflow: 'hidden' }}>
+                                        <div style={{ height: '100%', borderRadius: 2, width: `${Math.min(100, (password.length / 8) * 100)}%`, background: password.length >= 8 ? 'var(--color-success)' : password.length >= 4 ? '#f59e0b' : '#ef4444', transition: 'all 0.3s ease' }} />
+                                    </div>
+                                    <small style={{ color: password.length >= 8 ? 'var(--color-success)' : password.length > 0 ? 'var(--color-danger)' : 'var(--color-text-muted)', fontSize: 11, whiteSpace: 'nowrap', fontWeight: 500 }}>
+                                        {password.length === 0 ? '8 caracteres minimum' : password.length < 8 ? `${8 - password.length} caractere${8 - password.length > 1 ? 's' : ''} restant${8 - password.length > 1 ? 's' : ''}` : '✓ Mot de passe valide'}
+                                    </small>
+                                </div>
+                            </div>
+                            <button className="btn btn-primary btn-full" type="submit" disabled={loading}>
+                                {loading ? 'Creation...' : 'Creer mon compte'}
+                            </button>
+                            {error && <p className="error-msg" role="alert">{sanitizeText(error)}</p>}
+                        </form>
+                    </div>
+                )}
+            </div>
+        </main>
+    );
+}
+
+/* ===== Student: Dashboard ===== */
+
+const STATUS_LABELS_FR = {
+    'a_envoyer': 'A postuler', 'to_send': 'A postuler',
+    'envoyee': 'Envoyee', 'sent': 'Envoyee',
+    'relance': 'Relancee', 'followed_up': 'Relancee',
+    'entretien': 'Entretien', 'interview': 'Entretien',
+    'refusee': 'Refusee', 'rejected': 'Refusee',
+    'obtenu': 'Obtenu ✓', 'accepted': 'Obtenu ✓',
+};
+const STATUS_COLORS = {
+    'a_envoyer': '#94a3b8', 'to_send': '#94a3b8',
+    'envoyee': '#3b82f6', 'sent': '#3b82f6',
+    'relance': '#f59e0b', 'followed_up': '#f59e0b',
+    'entretien': '#8b5cf6', 'interview': '#8b5cf6',
+    'refusee': '#ef4444', 'rejected': '#ef4444',
+    'obtenu': '#16a34a', 'accepted': '#16a34a',
+};
+
+function StudentDashboard({ user, toast }) {
+    const [hasCv, setHasCv] = useState(user?.has_cv || false);
+    const [cvFilename, setCvFilename] = useState(user?.cv_filename || '');
+    const [uploading, setUploading] = useState(false);
+    const [savedCount, setSavedCount] = useState(0);
+    const [appsCount, setAppsCount] = useState(0);
+    const [stats, setStats] = useState(null);
+    const [showFoundModal, setShowFoundModal] = useState(false);
+    const [companyName, setCompanyName] = useState('');
+    const [submitting, setSubmitting] = useState(false);
+    const [dragging, setDragging] = useState(false);
+    const fileRef = useRef(null);
+
+    useEffect(() => {
+        api('/api/student/stats')
+            .then((d) => {
+                setStats(d);
+                setSavedCount(d.saved_count || 0);
+                setAppsCount(d.total_apps || 0);
+                setHasCv(d.has_cv || false);
+            })
+            .catch(() => {});
+        api('/api/student/profile')
+            .then((d) => { setHasCv(d.has_cv || false); setCvFilename(d.cv_filename || ''); })
+            .catch(() => {});
+    }, []);
+
+    const uploadCv = useCallback(async (file) => {
+        if (!file) return;
+        setUploading(true);
+        try {
+            const fd = new FormData();
+            fd.append('file', file);
+            await api('/api/student/upload-cv', { method: 'POST', body: fd, headers: {} });
+            setHasCv(true);
+            setCvFilename(file.name);
+            toast('CV telecharge avec succes');
+        } catch (err) {
+            toast(err.message, 'error');
+        } finally {
+            setUploading(false);
+        }
+    }, [toast]);
+
+    const handleDrop = useCallback((e) => {
+        e.preventDefault();
+        setDragging(false);
+        const f = e.dataTransfer.files[0];
+        if (f) uploadCv(f);
+    }, [uploadCv]);
+
+    const handleDragOver = useCallback((e) => { e.preventDefault(); setDragging(true); }, []);
+    const handleDragLeave = useCallback(() => setDragging(false), []);
+
+    const handleFoundStage = useCallback(async () => {
+        if (!companyName.trim()) return;
+        setSubmitting(true);
+        try {
+            await api('/api/student/status', {
+                method: 'PATCH',
+                body: JSON.stringify({ stage_status: 'found', company: companyName }),
+            });
+            toast('Felicitations ! Statut mis a jour.');
+            setShowFoundModal(false);
+        } catch (err) {
+            toast(err.message, 'error');
+        } finally {
+            setSubmitting(false);
+        }
+    }, [companyName, toast]);
+
+    const displayName = user?.first_name || user?.prenom || 'Etudiant';
+
+    return (
+        <section className="fade-in">
+            <div className="page-title-group">
+                <h1 className="page-title">Bienvenue, {sanitizeText(displayName)}</h1>
+                <p className="page-subtitle">Retrouvez vos offres et candidatures</p>
+            </div>
+
+            <div className="card">
+                <h3 className="card-title">Mon CV</h3>
+                <p className="card-subtitle">Deposez votre CV pour enrichir vos candidatures</p>
+                {hasCv ? (
+                    <div className="flex-center">
+                        <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>{sanitizeText(cvFilename) || 'CV.pdf'}</span>
+                        <a href="/api/student/cv" target="_blank" rel="noopener noreferrer" className="btn btn-outline btn-sm" aria-label="Voir le CV">
+                            <Icon.Eye /> Voir
+                        </a>
+                        <button className="btn btn-outline btn-sm" onClick={() => fileRef.current?.click()}>Remplacer</button>
+                        <input ref={fileRef} type="file" accept=".pdf" hidden onChange={(e) => uploadCv(e.target.files[0])} aria-label="Telecharger un nouveau CV" />
+                    </div>
+                ) : (
+                    <div>
+                        <div
+                            className={`cv-upload-area${dragging ? ' dragging' : ''}`}
+                            role="button"
+                            tabIndex={0}
+                            aria-label="Deposer ou cliquer pour telecharger un CV"
+                            onClick={() => fileRef.current?.click()}
+                            onKeyDown={(e) => e.key === 'Enter' && fileRef.current?.click()}
+                            onDrop={handleDrop}
+                            onDragOver={handleDragOver}
+                            onDragLeave={handleDragLeave}
+                        >
+                            <Icon.Upload />
+                            <p>{uploading ? 'Telechargement en cours...' : 'Cliquez ou deposez votre CV ici'}</p>
+                            <span className="hint">Format PDF uniquement</span>
+                        </div>
+                        <input ref={fileRef} type="file" accept=".pdf" hidden onChange={(e) => uploadCv(e.target.files[0])} aria-label="Telecharger un CV" />
+                    </div>
+                )}
+            </div>
+
+            <div className="stats-row" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+                <div className="stat-card orange">
+                    <div className="stat-number">{savedCount}</div>
+                    <div className="stat-label">Offres sauvegardees</div>
+                </div>
+                <div className="stat-card">
+                    <div className="stat-number">{appsCount}</div>
+                    <div className="stat-label">Candidatures</div>
+                </div>
+                <div className="stat-card green">
+                    <div className="stat-number">{stats?.response_rate ?? 0}%</div>
+                    <div className="stat-label">Taux de reponse</div>
+                </div>
+                <div className="stat-card" style={{ borderLeft: `3px solid ${stats?.stage_status === 'found' ? 'var(--color-success)' : '#8b5cf6'}` }}>
+                    <div className="stat-number" style={{ fontSize: 18 }}>{stats?.stage_status === 'found' ? 'Trouve ✓' : 'En cours'}</div>
+                    <div className="stat-label">Statut stage</div>
+                </div>
+            </div>
+
+            {stats && appsCount > 0 && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 16 }}>
+                    {/* Status breakdown */}
+                    <div className="card">
+                        <h3 className="card-title" style={{ fontSize: 14 }}>Repartition des candidatures</h3>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+                            {Object.entries(stats.by_status || {}).map(([status, count]) => {
+                                const pct = Math.round((count / appsCount) * 100);
+                                return (
+                                    <div key={status} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <div style={{ width: 90, fontSize: 12, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>
+                                            {STATUS_LABELS_FR[status] || status}
+                                        </div>
+                                        <div style={{ flex: 1, height: 20, background: '#f1f5f9', borderRadius: 4, overflow: 'hidden' }}>
+                                            <div style={{ height: '100%', width: `${Math.max(pct, 5)}%`, background: STATUS_COLORS[status] || '#94a3b8', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 6, transition: 'width 0.5s ease' }}>
+                                                <span style={{ fontSize: 10, color: '#fff', fontWeight: 600 }}>{count}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* Weekly activity chart */}
+                    <div className="card">
+                        <h3 className="card-title" style={{ fontSize: 14 }}>Activite des 8 dernieres semaines</h3>
+                        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 120, marginTop: 12, paddingTop: 8 }}>
+                            {(stats.weekly || []).map((w, i) => {
+                                const maxCount = Math.max(...(stats.weekly || []).map(x => x.count), 1);
+                                const h = Math.max((w.count / maxCount) * 100, 4);
+                                return (
+                                    <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                                        <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-secondary)' }}>{w.count > 0 ? w.count : ''}</span>
+                                        <div style={{ width: '100%', height: `${h}%`, background: w.count > 0 ? 'var(--color-primary)' : '#e2e8f0', borderRadius: 3, transition: 'height 0.5s ease', minHeight: 4 }} title={`Semaine du ${w.week}: ${w.count} candidature(s)`} />
+                                        <span style={{ fontSize: 9, color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>{w.week}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <div className="text-center mt-24">
+                <button className="found-stage-btn" onClick={() => setShowFoundModal(true)}>
+                    <Icon.Check /> J'ai trouve mon stage !
+                </button>
+            </div>
+
+            {showFoundModal && (
+                <Modal onClose={() => setShowFoundModal(false)}>
+                    <h2>Felicitations !</h2>
+                    <div className="form-group">
+                        <label htmlFor="found-company">Nom de l'entreprise</label>
+                        <input id="found-company" className="input" type="text" value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Ex: Fondation Louis Vuitton" maxLength={200} />
+                    </div>
+                    <div className="flex-row">
+                        <button className="btn btn-outline btn-sm" onClick={() => setShowFoundModal(false)}>Annuler</button>
+                        <button className="btn btn-success btn-sm" onClick={handleFoundStage} disabled={submitting || !companyName.trim()}>
+                            {submitting ? 'Envoi...' : 'Confirmer'}
+                        </button>
+                    </div>
+                </Modal>
+            )}
+        </section>
+    );
+}
+
+/* ===== Student: Offres (Job Search) ===== */
+
+function JobCard({ job, isSaved, savedIds, onSave, onRemove }) {
+    const id = job.job_id || job.id;
+    const contractClass = (job.contract_type || '').toLowerCase() === 'stage' ? 'stage' : 'alternance';
+
+    return (
+        <article className="job-card">
+            <div className="job-card-header">
+                <div>
+                    <h3>{sanitizeText(job.title) || 'Sans titre'}</h3>
+                    {job.company && <div className="job-company">{sanitizeText(job.company)}</div>}
+                    {job.location && <div className="job-location">{sanitizeText(job.location)}</div>}
+                </div>
+            </div>
+            <div className="job-badges">
+                {job.platform && <span className="platform-badge">{sanitizeText(job.platform)}</span>}
+                {job.contract_type && (
+                    <span className={`contract-badge ${contractClass}`}>
+                        {sanitizeText(job.contract_type)}
+                    </span>
+                )}
+            </div>
+            <div className="job-desc">{truncate(sanitizeText(job.description), 180)}</div>
+            <div className="job-actions">
+                {job.url && (
+                    <a href={safeHref(job.url)} target="_blank" rel="noopener noreferrer" className="btn btn-outline btn-sm">
+                        Voir l'offre
+                    </a>
+                )}
+                {isSaved ? (
+                    <button className="btn btn-outline btn-sm" style={{ color: 'var(--color-danger)', borderColor: 'var(--color-danger)' }} onClick={() => onRemove(id)} title="Retirer des favoris">
+                        Retirer
+                    </button>
+                ) : (
+                    <button className={`heart-btn${savedIds.has(id) ? ' saved' : ''}`} onClick={() => onSave(job)} title="Sauvegarder l'offre" aria-label="Sauvegarder l'offre">
+                        <Icon.Heart filled={savedIds.has(id)} />
+                    </button>
+                )}
+            </div>
+        </article>
+    );
+}
+
+function StudentOffres({ toast }) {
+    const [keywords, setKeywords] = useState('');
+    const [sector, setSector] = useState('');
+    const [location, setLocation] = useState('Paris');
+    const [results, setResults] = useState([]);
+    const [savedJobs, setSavedJobs] = useState([]);
+    const [savedIds, setSavedIds] = useState(new Set());
+    const [searching, setSearching] = useState(false);
+    const [tab, setTab] = useState('results');
+    const [loadingSaved, setLoadingSaved] = useState(false);
+    const [hasSearched, setHasSearched] = useState(false);
+
+    const fetchSaved = useCallback(async () => {
+        setLoadingSaved(true);
+        try {
+            const d = await api('/api/student/saved-jobs');
+            const jobs = Array.isArray(d) ? d : d.jobs || [];
+            setSavedJobs(jobs);
+            setSavedIds(new Set(jobs.map((j) => j.job_id || j.id)));
+        } catch (err) {
+            toast(err.message, 'error');
+        } finally {
+            setLoadingSaved(false);
+        }
+    }, [toast]);
+
+    useEffect(() => { fetchSaved(); }, [fetchSaved]);
+
+    const handleSearch = useCallback(async (e) => {
+        e.preventDefault();
+        if (!keywords.trim()) return;
+        setSearching(true);
+        setHasSearched(true);
+        setTab('results');
+        try {
+            const d = await api('/api/student/search', {
+                method: 'POST',
+                body: JSON.stringify({ keywords, sector, location }),
+            });
+            setResults(Array.isArray(d) ? d : d.jobs || d.results || []);
+        } catch (err) {
+            toast(err.message, 'error');
+        } finally {
+            setSearching(false);
+        }
+    }, [keywords, sector, location, toast]);
+
+    const handleSave = useCallback(async (job) => {
+        try {
+            await api('/api/student/save-job', {
+                method: 'POST',
+                body: JSON.stringify({
+                    title: job.title || '',
+                    company: job.company || '',
+                    location: job.location || '',
+                    url: job.url || '',
+                    platform: job.platform || '',
+                    description: job.description || '',
+                    contract_type: job.contract_type || '',
+                    sector: job.sector || '',
+                    score: job.score || 0,
+                    explanation: job.explanation || '',
+                }),
+            });
+            setSavedIds((prev) => new Set([...prev, job.job_id || job.id]));
+            toast('Offre sauvegardee');
+            fetchSaved();
+        } catch (err) {
+            toast(err.message, 'error');
+        }
+    }, [toast, fetchSaved]);
+
+    const handleRemove = useCallback(async (jobId) => {
+        try {
+            await api(`/api/student/saved-jobs/${jobId}`, { method: 'DELETE' });
+            setSavedIds((prev) => { const n = new Set(prev); n.delete(jobId); return n; });
+            toast('Offre retiree');
+            fetchSaved();
+        } catch (err) {
+            toast(err.message, 'error');
+        }
+    }, [toast, fetchSaved]);
+
+    return (
+        <section className="fade-in">
+            <div className="page-title-group">
+                <h1 className="page-title">Offres de stage</h1>
+                <p className="page-subtitle">Explorez les opportunites dans le secteur culturel</p>
+            </div>
+            <form className="search-form" onSubmit={handleSearch} role="search">
+                <div className="form-group keyword">
+                    <label htmlFor="search-keywords">Mots-cles</label>
+                    <input id="search-keywords" className="input" type="text" value={keywords} onChange={(e) => setKeywords(e.target.value)} placeholder="Ex: assistant curateur art contemporain" maxLength={200} />
+                </div>
+                <div className="form-group">
+                    <label htmlFor="search-sector">Secteur</label>
+                    <select id="search-sector" className="input" value={sector} onChange={(e) => setSector(e.target.value)}>
+                        <option value="">Tous les secteurs</option>
+                        {SECTORS.map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                </div>
+                <div className="form-group">
+                    <label htmlFor="search-location">Localisation</label>
+                    <input id="search-location" className="input" type="text" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Paris" maxLength={100} />
+                </div>
+                <button className="btn btn-primary" type="submit" disabled={searching} style={{ height: 42, marginBottom: 0 }}>
+                    {searching ? 'Recherche...' : 'Rechercher'}
+                </button>
+            </form>
+
+            <div className="tabs" role="tablist" aria-label="Resultats de recherche">
+                <button className={`tab${tab === 'results' ? ' active' : ''}`} role="tab" aria-selected={tab === 'results'} onClick={() => setTab('results')}>
+                    Resultats {hasSearched ? `(${results.length})` : ''}
+                </button>
+                <button className={`tab${tab === 'saved' ? ' active' : ''}`} role="tab" aria-selected={tab === 'saved'} onClick={() => { setTab('saved'); fetchSaved(); }}>
+                    Sauvegardees ({savedJobs.length})
+                </button>
+            </div>
+
+            {tab === 'results' && (
+                searching ? <Spinner /> : (
+                    hasSearched ? (
+                        results.length > 0
+                            ? <div className="job-cards">{results.map((j) => <JobCard key={j.job_id || j.id || Math.random()} job={j} isSaved={false} savedIds={savedIds} onSave={handleSave} onRemove={handleRemove} />)}</div>
+                            : <EmptyState>Aucune offre pour le moment. Essayez d'autres mots-cles ou un secteur different.</EmptyState>
+                    ) : <EmptyState>Lancez une recherche pour decouvrir les opportunites de stage dans le secteur culturel.</EmptyState>
+                )
+            )}
+
+            {tab === 'saved' && (
+                loadingSaved ? <Spinner /> : (
+                    savedJobs.length > 0
+                        ? <div className="job-cards">{savedJobs.map((j) => <JobCard key={j.job_id || j.id} job={j} isSaved={true} savedIds={savedIds} onSave={handleSave} onRemove={handleRemove} />)}</div>
+                        : <EmptyState>Aucune offre sauvegardee pour le moment. Explorez les offres et sauvegardez celles qui vous interessent.</EmptyState>
+                )
+            )}
+        </section>
+    );
+}
+
+/* ===== Student: Suivi (Application Tracking) ===== */
+
+function StudentSuivi({ toast }) {
+    const [apps, setApps] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [showModal, setShowModal] = useState(false);
+    const [form, setForm] = useState({ title: '', company: '', url: '', notes: '' });
+    const [creating, setCreating] = useState(false);
+
+    const fetchApps = useCallback(async () => {
+        try {
+            const d = await api('/api/student/applications');
+            setApps(Array.isArray(d) ? d : d.applications || []);
+        } catch (err) {
+            toast(err.message, 'error');
+        } finally {
+            setLoading(false);
+        }
+    }, [toast]);
+
+    useEffect(() => { fetchApps(); }, [fetchApps]);
+
+    const handleAdd = useCallback(async (e) => {
+        e.preventDefault();
+        setCreating(true);
+        try {
+            await api('/api/student/applications', {
+                method: 'POST',
+                body: JSON.stringify({
+                    job_title: form.title,
+                    title: form.title,
+                    company: form.company,
+                    url: form.url,
+                    notes: form.notes,
+                    status: 'a_envoyer',
+                }),
+            });
+            toast('Candidature ajoutee');
+            setShowModal(false);
+            setForm({ title: '', company: '', url: '', notes: '' });
+            fetchApps();
+        } catch (err) {
+            toast(err.message, 'error');
+        } finally {
+            setCreating(false);
+        }
+    }, [form, toast, fetchApps]);
+
+    const handleStatusChange = useCallback(async (id, newStatus) => {
+        try {
+            const app = apps.find((a) => a.id === id);
+            await api(`/api/student/applications/${id}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ status: newStatus, notes: app?.notes || '' }),
+            });
+            setApps((prev) => prev.map((a) => a.id === id ? { ...a, status: newStatus } : a));
+            const statusLabel = TRACKING_STATUSES.find((s) => s.value === newStatus)?.label || newStatus;
+            toast(`Statut mis a jour : ${statusLabel}`);
+        } catch (err) {
+            toast(err.message, 'error');
+        }
+    }, [apps, toast]);
+
+    const handleDelete = useCallback(async (id) => {
+        if (!confirm('Supprimer cette candidature ?')) return;
+        try {
+            await api(`/api/student/applications/${id}`, { method: 'DELETE' });
+            toast('Candidature supprimee');
+            setApps((prev) => prev.filter((a) => a.id !== id));
+        } catch (err) {
+            toast(err.message, 'error');
+        }
+    }, [toast]);
+
+    const updateFormField = useCallback((field, value) => {
+        setForm((prev) => ({ ...prev, [field]: value }));
+    }, []);
+
+    return (
+        <section className="fade-in">
+            <div className="page-header">
+                <div>
+                    <h1 className="page-title">Mes candidatures</h1>
+                    <p className="page-subtitle">Suivez l'avancement de vos demarches</p>
+                </div>
+                <button className="btn btn-primary btn-sm" onClick={() => setShowModal(true)} aria-label="Ajouter une candidature">
+                    <Icon.Plus /> Ajouter
+                </button>
+            </div>
+
+            {loading ? <Spinner /> : (
+                apps.length > 0 ? (
+                    <div style={{ overflowX: 'auto' }}>
+                        <table className="tracking-table">
+                            <thead>
+                                <tr>
+                                    <th>Poste</th>
+                                    <th>Entreprise</th>
+                                    <th>Statut</th>
+                                    <th>Date</th>
+                                    <th>Notes</th>
+                                    <th><span className="sr-only">Actions</span></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {apps.map((a) => (
+                                    <tr key={a.id}>
+                                        <td style={{ fontWeight: 500, color: 'var(--color-heading)' }}>{sanitizeText(a.job_title || a.title) || '-'}</td>
+                                        <td>{sanitizeText(a.company) || '-'}</td>
+                                        <td>
+                                            <select className="status-select" value={a.status || 'a_envoyer'} onChange={(e) => handleStatusChange(a.id, e.target.value)} aria-label="Changer le statut">
+                                                {TRACKING_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                                            </select>
+                                        </td>
+                                        <td style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{relativeTime(a.created_at || a.date)}</td>
+                                        <td style={{ fontSize: 13, color: 'var(--color-text-muted)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {sanitizeText(a.notes) || '-'}
+                                        </td>
+                                        <td>
+                                            <button className="btn btn-outline btn-sm" style={{ color: 'var(--color-danger)', borderColor: '#fecaca', padding: '4px 8px' }} onClick={() => handleDelete(a.id)} title="Supprimer la candidature" aria-label="Supprimer la candidature">
+                                                <Icon.Trash />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                ) : <EmptyState>Aucune candidature pour le moment. Ajoutez une candidature pour commencer le suivi de vos demarches.</EmptyState>
+            )}
+
+            {showModal && (
+                <Modal onClose={() => setShowModal(false)}>
+                    <h2>Ajouter une candidature</h2>
+                    <form onSubmit={handleAdd} noValidate>
+                        <div className="form-group">
+                            <label htmlFor="app-title">Titre du poste</label>
+                            <input id="app-title" className="input" type="text" value={form.title} onChange={(e) => updateFormField('title', e.target.value)} placeholder="Ex: Stage assistant curateur" required maxLength={200} />
+                        </div>
+                        <div className="form-group">
+                            <label htmlFor="app-company">Entreprise</label>
+                            <input id="app-company" className="input" type="text" value={form.company} onChange={(e) => updateFormField('company', e.target.value)} placeholder="Nom de l'entreprise" required maxLength={200} />
+                        </div>
+                        <div className="form-group">
+                            <label htmlFor="app-url">URL de l'offre (optionnel)</label>
+                            <input id="app-url" className="input" type="url" value={form.url} onChange={(e) => updateFormField('url', e.target.value)} placeholder="https://..." maxLength={500} />
+                        </div>
+                        <div className="form-group">
+                            <label htmlFor="app-notes">Notes</label>
+                            <textarea id="app-notes" className="input" rows={3} value={form.notes} onChange={(e) => updateFormField('notes', e.target.value)} placeholder="Notes personnelles..." style={{ resize: 'vertical' }} maxLength={1000}></textarea>
+                        </div>
+                        <div className="flex-row">
+                            <button type="button" className="btn btn-outline btn-sm" onClick={() => setShowModal(false)}>Annuler</button>
+                            <button type="submit" className="btn btn-primary btn-sm" disabled={creating}>
+                                {creating ? 'Ajout...' : 'Ajouter'}
+                            </button>
+                        </div>
+                    </form>
+                </Modal>
+            )}
+        </section>
+    );
+}
+
+/* ===== Student: Mon Profil ===== */
+
+function StudentProfil({ user, toast }) {
+    const [profile, setProfile] = useState({ first_name: '', last_name: '', school_id: '', promo: '', sector: '' });
+    const [schools, setSchools] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [hasCv, setHasCv] = useState(false);
+    const [cvFilename, setCvFilename] = useState('');
+    const [uploading, setUploading] = useState(false);
+    const fileRef = useRef(null);
+
+    useEffect(() => {
+        Promise.all([
+            api('/api/student/profile').catch(() => ({})),
+            api('/api/schools').catch(() => []),
+        ]).then(([p, s]) => {
+            setProfile({
+                first_name: p.first_name || p.prenom || '',
+                last_name: p.last_name || p.nom || '',
+                school_id: p.school_id || '',
+                promo: p.promo || '',
+                sector: p.sector || p.secteur || '',
+            });
+            setHasCv(p.has_cv || false);
+            setCvFilename(p.cv_filename || '');
+            setSchools(Array.isArray(s) ? s : s.schools || []);
+            setLoading(false);
+        });
+    }, []);
+
+    const updateField = useCallback((field, value) => {
+        setProfile((prev) => ({ ...prev, [field]: value }));
+    }, []);
+
+    const handleSave = useCallback(async (e) => {
+        e.preventDefault();
+        setSaving(true);
+        try {
+            await api('/api/student/profile', { method: 'POST', body: JSON.stringify(profile) });
+            toast('Profil sauvegarde');
+        } catch (err) {
+            toast(err.message, 'error');
+        } finally {
+            setSaving(false);
+        }
+    }, [profile, toast]);
+
+    const uploadCv = useCallback(async (file) => {
+        if (!file) return;
+        setUploading(true);
+        try {
+            const fd = new FormData();
+            fd.append('file', file);
+            await api('/api/student/upload-cv', { method: 'POST', body: fd, headers: {} });
+            setHasCv(true);
+            setCvFilename(file.name);
+            toast('CV telecharge');
+        } catch (err) {
+            toast(err.message, 'error');
+        } finally {
+            setUploading(false);
+        }
+    }, [toast]);
+
+    if (loading) {
+        return (
+            <section>
+                <h1 className="page-title">Mon profil</h1>
+                <Spinner />
+            </section>
+        );
+    }
+
+    return (
+        <section className="fade-in">
+            <div className="page-title-group">
+                <h1 className="page-title">Mon profil</h1>
+                <p className="page-subtitle">Completez vos informations pour optimiser vos recherches</p>
+            </div>
+            <div className="card">
+                <form onSubmit={handleSave} noValidate>
+                    <div className="grid-2">
+                        <div className="form-group">
+                            <label htmlFor="profil-firstname">Prenom</label>
+                            <input id="profil-firstname" className="input" type="text" value={profile.first_name} onChange={(e) => updateField('first_name', e.target.value)} maxLength={100} autoComplete="given-name" />
+                        </div>
+                        <div className="form-group">
+                            <label htmlFor="profil-lastname">Nom</label>
+                            <input id="profil-lastname" className="input" type="text" value={profile.last_name} onChange={(e) => updateField('last_name', e.target.value)} maxLength={100} autoComplete="family-name" />
+                        </div>
+                    </div>
+                    <div className="form-group">
+                        <label htmlFor="profil-school">Ecole</label>
+                        <select id="profil-school" className="input" value={profile.school_id} onChange={(e) => updateField('school_id', e.target.value)}>
+                            <option value="">Selectionnez votre ecole</option>
+                            {schools.map((s) => <option key={s.id} value={s.id}>{sanitizeText(s.name || s.nom)}</option>)}
+                        </select>
+                    </div>
+                    <div className="grid-2">
+                        <div className="form-group">
+                            <label htmlFor="profil-promo">Promotion</label>
+                            <input id="profil-promo" className="input" type="text" value={profile.promo} onChange={(e) => updateField('promo', e.target.value)} placeholder="Ex: Bachelor 3" maxLength={50} />
+                        </div>
+                        <div className="form-group">
+                            <label htmlFor="profil-sector">Secteur cible</label>
+                            <select id="profil-sector" className="input" value={profile.sector} onChange={(e) => updateField('sector', e.target.value)}>
+                                <option value="">Choisir un secteur</option>
+                                {SECTORS.map((s) => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                        </div>
+                    </div>
+                    <button className="btn btn-primary" type="submit" disabled={saving}>
+                        {saving ? 'Sauvegarde...' : 'Sauvegarder'}
+                    </button>
+                </form>
+            </div>
+
+            <div className="card">
+                <h3 className="card-title">Mon CV</h3>
+                <p className="card-subtitle">Votre CV au format PDF</p>
+                {hasCv ? (
+                    <div className="flex-center">
+                        <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>{sanitizeText(cvFilename) || 'CV.pdf'}</span>
+                        <a href="/api/student/cv" target="_blank" rel="noopener noreferrer" className="btn btn-outline btn-sm" aria-label="Voir le CV">Voir</a>
+                        <button className="btn btn-outline btn-sm" onClick={() => fileRef.current?.click()} disabled={uploading}>
+                            {uploading ? 'Telechargement...' : 'Remplacer'}
+                        </button>
+                        <input ref={fileRef} type="file" accept=".pdf" hidden onChange={(e) => uploadCv(e.target.files[0])} aria-label="Remplacer le CV" />
+                    </div>
+                ) : (
+                    <div>
+                        <button className="btn btn-outline btn-sm" onClick={() => fileRef.current?.click()} disabled={uploading}>
+                            {uploading ? 'Telechargement...' : 'Telecharger un CV'}
+                        </button>
+                        <input ref={fileRef} type="file" accept=".pdf" hidden onChange={(e) => uploadCv(e.target.files[0])} aria-label="Telecharger un CV" />
+                    </div>
+                )}
+            </div>
+        </section>
+    );
+}
+
+/* ===== Student: Messages ===== */
+
+function StudentMessages({ toast }) {
+    const [messages, setMessages] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [text, setText] = useState('');
+    const [sending, setSending] = useState(false);
+    const chatBodyRef = useRef(null);
+
+    const fetchMessages = useCallback(() => {
+        api('/api/student/messages')
+            .then((d) => setMessages(Array.isArray(d) ? d : d.messages || []))
+            .catch((err) => toast(err.message, 'error'))
+            .finally(() => setLoading(false));
+    }, [toast]);
+
+    useEffect(() => { fetchMessages(); }, [fetchMessages]);
+
+    useEffect(() => {
+        if (chatBodyRef.current) {
+            chatBodyRef.current.scrollTop = chatBodyRef.current.scrollHeight;
+        }
+    }, [messages]);
+
+    const sendMessage = useCallback(async () => {
+        if (!text.trim()) return;
+        setSending(true);
+        try {
+            await api('/api/student/messages', { method: 'POST', body: JSON.stringify({ content: text }) });
+            setText('');
+            fetchMessages();
+        } catch (err) {
+            toast(err.message, 'error');
+        } finally {
+            setSending(false);
+        }
+    }, [text, toast, fetchMessages]);
+
+    const handleKeyDown = useCallback((e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    }, [sendMessage]);
+
+    return (
+        <section className="fade-in">
+            <div className="page-title-group">
+                <h1 className="page-title">Messages</h1>
+                <p className="page-subtitle">Echangez avec le service relations entreprises</p>
+            </div>
+            <div className="messaging-layout" style={{ height: 'calc(100vh - 180px)' }}>
+                <div className="msg-chat" style={{ width: '100%' }}>
+                    <div className="msg-chat-header">Conversation avec le service relations entreprises</div>
+                    <div className="msg-chat-body" ref={chatBodyRef}>
+                        {loading ? <Spinner /> : (
+                            messages.length > 0 ? messages.map((m, i) => (
+                                <div key={m.id || i} className={`msg-bubble ${m.from_admin ? 'received' : 'sent'}`}>
+                                    <div>{sanitizeText(m.content || m.message || m.text)}</div>
+                                    <div className="msg-bubble-time">{relativeTime(m.sent_at || m.created_at || m.date)}</div>
+                                </div>
+                            )) : <div className="msg-empty">Aucun message pour le moment. N'hesitez pas a nous contacter pour toute question.</div>
+                        )}
+                    </div>
+                    <div className="msg-input-area">
+                        <input
+                            className="input"
+                            type="text"
+                            value={text}
+                            onChange={(e) => setText(e.target.value)}
+                            placeholder="Ecrire un message..."
+                            onKeyDown={handleKeyDown}
+                            maxLength={2000}
+                            aria-label="Message"
+                        />
+                        <button className="btn btn-primary btn-sm" onClick={sendMessage} disabled={sending || !text.trim()}>
+                            {sending ? '...' : 'Envoyer'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    );
+}
+
+/* ===== Admin: Recherche de stages ===== */
+
+function AdminSearch({ toast }) {
+    const [keywords, setKeywords] = useState('');
+    const [sector, setSector] = useState('');
+    const [location, setLocation] = useState('Paris');
+    const [results, setResults] = useState([]);
+    const [searching, setSearching] = useState(false);
+    const [hasSearched, setHasSearched] = useState(false);
+    const [students, setStudents] = useState([]);
+    const [recommendModal, setRecommendModal] = useState(null);
+    const [selectedStudent, setSelectedStudent] = useState('');
+    const [sending, setSending] = useState(false);
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const d = await api('/api/admin/students');
+                setStudents(Array.isArray(d) ? d : d.students || []);
+            } catch (_) {}
+        })();
+    }, []);
+
+    const handleSearch = useCallback(async (e) => {
+        e.preventDefault();
+        if (!keywords.trim()) return;
+        setSearching(true);
+        setHasSearched(true);
+        try {
+            const d = await api('/api/admin/search', {
+                method: 'POST',
+                body: JSON.stringify({ keywords, sector, location }),
+            });
+            setResults(Array.isArray(d) ? d : d.jobs || d.results || []);
+        } catch (err) {
+            toast(err.message, 'error');
+        } finally {
+            setSearching(false);
+        }
+    }, [keywords, sector, location, toast]);
+
+    const handleRecommend = useCallback(async () => {
+        if (!selectedStudent || !recommendModal) return;
+        setSending(true);
+        try {
+            await api('/api/admin/recommend-job', {
+                method: 'POST',
+                body: JSON.stringify({
+                    student_id: parseInt(selectedStudent),
+                    job_title: recommendModal.title || '',
+                    job_company: recommendModal.company || '',
+                    job_url: recommendModal.url || '',
+                    job_description: recommendModal.description || '',
+                }),
+            });
+            toast('Offre envoyee a l\'etudiant par message');
+            setRecommendModal(null);
+            setSelectedStudent('');
+        } catch (err) {
+            toast(err.message, 'error');
+        } finally {
+            setSending(false);
+        }
+    }, [selectedStudent, recommendModal, toast]);
+
+    return (
+        <section className="fade-in">
+            <div className="page-title-group">
+                <h1 className="page-title">Recherche de stages</h1>
+                <p className="page-subtitle">Trouvez des offres et recommandez-les a vos etudiants</p>
+            </div>
+            <form className="search-form" onSubmit={handleSearch} role="search">
+                <div className="form-group keyword">
+                    <label htmlFor="admin-search-keywords">Mots-cles</label>
+                    <input id="admin-search-keywords" className="input" type="text" value={keywords} onChange={(e) => setKeywords(e.target.value)} placeholder="Ex: assistant curateur art contemporain" maxLength={200} />
+                </div>
+                <div className="form-group">
+                    <label htmlFor="admin-search-sector">Secteur</label>
+                    <select id="admin-search-sector" className="input" value={sector} onChange={(e) => setSector(e.target.value)}>
+                        <option value="">Tous les secteurs</option>
+                        {SECTORS.map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                </div>
+                <div className="form-group">
+                    <label htmlFor="admin-search-location">Localisation</label>
+                    <input id="admin-search-location" className="input" type="text" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Paris" maxLength={100} />
+                </div>
+                <button className="btn btn-primary" type="submit" disabled={searching} style={{ height: 42, marginBottom: 0 }}>
+                    {searching ? 'Recherche...' : 'Rechercher'}
+                </button>
+            </form>
+
+            {searching && <Spinner />}
+
+            {!searching && hasSearched && results.length === 0 && (
+                <EmptyState>Aucune offre trouvee. Essayez d'autres mots-cles ou un secteur different.</EmptyState>
+            )}
+
+            {!searching && !hasSearched && (
+                <EmptyState>Lancez une recherche pour trouver des offres de stage a recommander a vos etudiants.</EmptyState>
+            )}
+
+            {!searching && results.length > 0 && (
+                <div className="job-cards">
+                    {results.map((job) => (
+                        <article className="job-card" key={job.job_id || job.id || Math.random()}>
+                            <div className="job-card-header">
+                                <div>
+                                    <h3>{sanitizeText(job.title) || 'Sans titre'}</h3>
+                                    {job.company && <div className="job-company">{sanitizeText(job.company)}</div>}
+                                    {job.location && <div className="job-location">{sanitizeText(job.location)}</div>}
+                                </div>
+                            </div>
+                            <div className="job-badges">
+                                {job.platform && <span className="platform-badge">{sanitizeText(job.platform)}</span>}
+                                {job.contract_type && (
+                                    <span className={`contract-badge ${(job.contract_type || '').toLowerCase() === 'stage' ? 'stage' : 'alternance'}`}>
+                                        {sanitizeText(job.contract_type)}
+                                    </span>
+                                )}
+                            </div>
+                            <div className="job-desc">{truncate(sanitizeText(job.description), 180)}</div>
+                            <div className="job-actions">
+                                {job.url && (
+                                    <a href={safeHref(job.url)} target="_blank" rel="noopener noreferrer" className="btn btn-outline btn-sm">
+                                        Voir l'offre
+                                    </a>
+                                )}
+                                <button className="btn btn-primary btn-sm" onClick={() => { setRecommendModal(job); setSelectedStudent(''); }}
+                                    title="Envoyer cette offre a un etudiant">
+                                    Recommander
+                                </button>
+                            </div>
+                        </article>
+                    ))}
+                </div>
+            )}
+
+            {recommendModal && (
+                <Modal onClose={() => setRecommendModal(null)}>
+                    <h2 style={{ marginBottom: 4 }}>Recommander cette offre</h2>
+                    <p style={{ color: 'var(--color-text-secondary)', marginBottom: 16, fontSize: 13 }}>
+                        <strong>{sanitizeText(recommendModal.title)}</strong>
+                        {recommendModal.company ? ` — ${sanitizeText(recommendModal.company)}` : ''}
+                    </p>
+                    <div className="form-group">
+                        <label htmlFor="recommend-student">Selectionner un etudiant</label>
+                        <select id="recommend-student" className="input" value={selectedStudent} onChange={(e) => setSelectedStudent(e.target.value)}>
+                            <option value="">-- Choisir un etudiant --</option>
+                            {students.map((s) => (
+                                <option key={s.id} value={s.id}>
+                                    {s.first_name} {s.last_name} {s.email ? `(${s.email})` : ''}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
+                        <button className="btn btn-outline btn-sm" onClick={() => setRecommendModal(null)}>Annuler</button>
+                        <button className="btn btn-primary btn-sm" onClick={handleRecommend} disabled={!selectedStudent || sending}>
+                            {sending ? 'Envoi...' : 'Envoyer par message'}
+                        </button>
+                    </div>
+                </Modal>
+            )}
+        </section>
+    );
+}
+
+/* ===== Admin: Dashboard ===== */
+
+function AdminDashboard({ toast, setPage }) {
+    const [stats, setStats] = useState([]);
+    const [students, setStudents] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        Promise.all([
+            api('/api/admin/stats').catch(() => []),
+            api('/api/admin/students').catch(() => []),
+        ]).then(([statsData, studentsData]) => {
+            setStats(Array.isArray(statsData) ? statsData : statsData.schools || statsData.stats || []);
+            setStudents(Array.isArray(studentsData) ? studentsData : studentsData.students || []);
+        }).finally(() => setLoading(false));
+    }, []);
+
+    const totals = useMemo(() => {
+        const totalStudents = stats.reduce((sum, s) => sum + (s.total ?? 0), 0);
+        const totalFound = stats.reduce((sum, s) => sum + (s.found ?? 0), 0);
+        const totalSearching = stats.reduce((sum, s) => sum + (s.searching ?? 0), 0);
+        const avgApps = students.length > 0
+            ? (students.reduce((sum, s) => sum + (s.applications_count ?? 0), 0) / students.length).toFixed(1)
+            : '0';
+        return { totalStudents, totalFound, totalSearching, avgApps };
+    }, [stats, students]);
+
+    if (loading) {
+        return (
+            <section>
+                <h1 className="page-title">Tableau de bord</h1>
+                <Spinner />
+            </section>
+        );
+    }
+
+    return (
+        <section className="fade-in">
+            <div className="page-title-group">
+                <h1 className="page-title">Tableau de bord</h1>
+                <p className="page-subtitle">Vue d'ensemble de vos promotions</p>
+            </div>
+
+            <div className="stats-row">
+                <div className="stat-card">
+                    <div className="stat-number">{totals.totalStudents}</div>
+                    <div className="stat-label">Etudiants inscrits</div>
+                </div>
+                <div className="stat-card green">
+                    <div className="stat-number">{totals.totalFound}</div>
+                    <div className="stat-label">Stages trouves</div>
+                </div>
+                <div className="stat-card orange">
+                    <div className="stat-number">{totals.totalSearching}</div>
+                    <div className="stat-label">En recherche</div>
+                </div>
+                <div className="stat-card">
+                    <div className="stat-number">{totals.avgApps}</div>
+                    <div className="stat-label">Moy. candidatures</div>
+                </div>
+            </div>
+
+            {stats.length > 0 && (
+                <div className="card">
+                    <h3 className="card-title">Taux de placement par ecole</h3>
+                    <p className="card-subtitle">Pourcentage d'etudiants ayant trouve un stage</p>
+                    <div className="bar-chart" style={{ marginTop: 16 }}>
+                        {stats.map((s, i) => {
+                            const pct = s.total > 0 ? Math.round((s.found / s.total) * 100) : 0;
+                            return (
+                                <div className="bar-chart-row" key={s.school_id || i}>
+                                    <div className="bar-chart-label" title={sanitizeText(s.school_name || s.name || 'Ecole')}>
+                                        {sanitizeText(s.school_name || s.name || 'Ecole')}
+                                    </div>
+                                    <div className="bar-chart-track" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+                                        <div className="bar-chart-fill" style={{ width: `${Math.max(pct, 5)}%` }}>
+                                            {pct}%
+                                        </div>
+                                    </div>
+                                    <span style={{ fontSize: 12, color: 'var(--color-text-muted)', minWidth: 60, textAlign: 'right' }}>
+                                        {s.found}/{s.total}
+                                    </span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
+            <div className="quick-actions mt-24">
+                <button className="quick-action-link" onClick={() => setPage('students')}>
+                    Voir le suivi <Icon.ArrowRight />
+                </button>
+                <button className="quick-action-link" onClick={() => setPage('messages')}>
+                    Messagerie <Icon.ArrowRight />
+                </button>
+            </div>
+        </section>
+    );
+}
+
+/* ===== Admin: Suivi Etudiants (Spreadsheet) ===== */
+
+function AdminStudents({ toast, setPage, setChatStudentId }) {
+    const [schools, setSchools] = useState([]);
+    const [activeSchool, setActiveSchool] = useState(null);
+    const [students, setStudents] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [editingCell, setEditingCell] = useState(null);
+    const [editValue, setEditValue] = useState('');
+    const [showAddSchool, setShowAddSchool] = useState(false);
+    const [newSchoolName, setNewSchoolName] = useState('');
+    const [renamingTab, setRenamingTab] = useState(null);
+    const [renameValue, setRenameValue] = useState('');
+    const [stageFilter, setStageFilter] = useState('all'); // 'all', 'found', 'searching'
+    const [importing, setImporting] = useState(false);
+    // Multi-column sort: array of { key, dir } — first = primary, second = secondary, etc.
+    const [sortStack, setSortStack] = useState([{ key: 'promo', dir: 'asc' }, { key: 'first_name', dir: 'asc' }]);
+    const csvInputRef = React.useRef(null);
+
+    const handleSort = useCallback((key) => {
+        setSortStack((prev) => {
+            const existingIdx = prev.findIndex((s) => s.key === key);
+            if (existingIdx === 0) {
+                // Already primary: toggle direction
+                const copy = [...prev];
+                copy[0] = { key, dir: copy[0].dir === 'asc' ? 'desc' : 'asc' };
+                return copy;
+            } else {
+                // New primary: remove from old position if exists, push old primary down
+                const filtered = prev.filter((s) => s.key !== key);
+                return [{ key, dir: 'asc' }, ...filtered].slice(0, 3); // max 3 levels
+            }
+        });
+    }, []);
+
+    const fetchSchools = useCallback(async () => {
+        try {
+            const d = await api('/api/schools');
+            const list = Array.isArray(d) ? d : d.schools || [];
+            setSchools(list);
+            if (list.length > 0 && !activeSchool) setActiveSchool(list[0].id);
+        } catch (err) {
+            toast(err.message, 'error');
+        }
+    }, [toast, activeSchool]);
+
+    const fetchStudents = useCallback(async (schoolId) => {
+        if (!schoolId) { setStudents([]); setLoading(false); return; }
+        setLoading(true);
+        try {
+            const d = await api(`/api/admin/students?school_id=${schoolId}`);
+            setStudents(Array.isArray(d) ? d : d.students || []);
+        } catch (err) {
+            toast(err.message, 'error');
+        } finally {
+            setLoading(false);
+        }
+    }, [toast]);
+
+    useEffect(() => { fetchSchools(); }, []);
+    useEffect(() => { if (activeSchool) fetchStudents(activeSchool); }, [activeSchool, fetchStudents]);
+
+    const startEdit = useCallback((rowId, field, currentValue) => {
+        setEditingCell({ rowId, field });
+        setEditValue(currentValue || '');
+    }, []);
+
+    const cancelEdit = useCallback(() => {
+        setEditingCell(null);
+        setEditValue('');
+    }, []);
+
+    const saveEdit = useCallback(async (rowId, field) => {
+        const payload = {};
+        if (field === 'stage_status') {
+            payload.stage_status = editValue === 'Oui' ? 'found' : 'searching';
+        } else {
+            payload[field] = editValue;
+        }
+        try {
+            await api(`/api/admin/students/${rowId}`, { method: 'PATCH', body: JSON.stringify(payload) });
+            setStudents((prev) => prev.map((s) => {
+                if (s.id !== rowId) return s;
+                if (field === 'stage_status') return { ...s, stage_status: payload.stage_status };
+                return { ...s, [field]: editValue };
+            }));
+        } catch (err) {
+            toast(err.message, 'error');
+        }
+        setEditingCell(null);
+        setEditValue('');
+    }, [editValue, toast]);
+
+    const handleCellKeyDown = useCallback((e, rowId, field) => {
+        if (e.key === 'Enter') saveEdit(rowId, field);
+        if (e.key === 'Escape') cancelEdit();
+    }, [saveEdit, cancelEdit]);
+
+    const addSchool = useCallback(async () => {
+        if (!newSchoolName.trim()) return;
+        try {
+            await api('/api/admin/schools', { method: 'POST', body: JSON.stringify({ name: newSchoolName }) });
+            toast('Ecole ajoutee');
+            setNewSchoolName('');
+            setShowAddSchool(false);
+            fetchSchools();
+        } catch (err) {
+            toast(err.message, 'error');
+        }
+    }, [newSchoolName, toast, fetchSchools]);
+
+    const handleTabDoubleClick = useCallback((school) => {
+        setRenamingTab(school.id);
+        setRenameValue(school.name || school.nom || '');
+    }, []);
+
+    const saveRename = useCallback(async (schoolId) => {
+        if (!renameValue.trim()) { setRenamingTab(null); return; }
+        try {
+            await api(`/api/admin/schools/${schoolId}`, { method: 'PATCH', body: JSON.stringify({ name: renameValue }) });
+            setSchools((prev) => prev.map((s) => s.id === schoolId ? { ...s, name: renameValue, nom: renameValue } : s));
+        } catch (err) {
+            toast(err.message, 'error');
+        }
+        setRenamingTab(null);
+    }, [renameValue, toast]);
+
+    const openChatPage = useCallback((student) => {
+        setChatStudentId(student.id);
+        setPage('messages');
+    }, [setChatStudentId, setPage]);
+
+    const handleCsvImport = useCallback(async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setImporting(true);
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            const url = activeSchool ? `/api/admin/import-csv?school_id=${activeSchool}` : '/api/admin/import-csv';
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${getToken()}` },
+                body: formData,
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Erreur import');
+            toast(`${data.created} etudiant(s) importe(s), ${data.skipped} ignore(s)`);
+            if (activeSchool) fetchStudents(activeSchool);
+        } catch (err) {
+            toast(err.message, 'error');
+        } finally {
+            setImporting(false);
+            if (csvInputRef.current) csvInputRef.current.value = '';
+        }
+    }, [activeSchool, toast, fetchStudents]);
+
+    const getSortVal = useCallback((student, key) => {
+        switch (key) {
+            case 'last_name': return (student.last_name || student.nom || '').toLowerCase();
+            case 'first_name': return (student.first_name || student.prenom || '').toLowerCase();
+            case 'promo': return (student.promo || '').toLowerCase();
+            case 'sector': return (student.sector || student.secteur || '').toLowerCase();
+            case 'stage_status': return student.stage_status === 'found' ? 'a' : 'z';
+            case 'applications_count': return student.applications_count ?? 0;
+            case 'saved_jobs_count': return student.saved_jobs_count ?? 0;
+            default: return '';
+        }
+    }, []);
+
+    const filteredStudents = useMemo(() => {
+        let list = students;
+        if (stageFilter === 'found') list = students.filter((s) => s.stage_status === 'found');
+        else if (stageFilter === 'searching') list = students.filter((s) => s.stage_status !== 'found');
+
+        const sorted = [...list].sort((a, b) => {
+            for (const { key, dir } of sortStack) {
+                const valA = getSortVal(a, key);
+                const valB = getSortVal(b, key);
+                if (typeof valA === 'number' && typeof valB === 'number') {
+                    const diff = dir === 'asc' ? valA - valB : valB - valA;
+                    if (diff !== 0) return diff;
+                } else {
+                    if (valA < valB) return dir === 'asc' ? -1 : 1;
+                    if (valA > valB) return dir === 'asc' ? 1 : -1;
+                }
+            }
+            return 0;
+        });
+        return sorted;
+    }, [students, stageFilter, sortStack, getSortVal]);
+
+    const renderCell = (student, field, displayValue) => {
+        const isEditing = editingCell?.rowId === student.id && editingCell?.field === field;
+
+        if (field === 'stage_status') {
+            const val = student.stage_status === 'found' ? 'Oui' : 'Non';
+            if (isEditing) {
+                return (
+                    <td className="editing">
+                        <select value={editValue} onChange={(e) => setEditValue(e.target.value)} onBlur={() => saveEdit(student.id, field)} onKeyDown={(e) => handleCellKeyDown(e, student.id, field)} autoFocus aria-label="Statut stage">
+                            <option value="Oui">Oui</option>
+                            <option value="Non">Non</option>
+                        </select>
+                    </td>
+                );
+            }
+            return (
+                <td onDoubleClick={() => startEdit(student.id, field, val)} style={{ cursor: 'pointer' }} title="Double-cliquer pour modifier">
+                    <span className={`tracking-status ${student.stage_status === 'found' ? 'accepte' : 'relance'}`}>
+                        {val}
+                    </span>
+                </td>
+            );
+        }
+
+        if (isEditing) {
+            return (
+                <td className="editing">
+                    <input value={editValue} onChange={(e) => setEditValue(e.target.value)} onBlur={() => saveEdit(student.id, field)} onKeyDown={(e) => handleCellKeyDown(e, student.id, field)} autoFocus maxLength={200} aria-label={field} />
+                </td>
+            );
+        }
+
+        return (
+            <td onDoubleClick={() => startEdit(student.id, field, displayValue)} style={{ cursor: 'pointer' }} title="Double-cliquer pour modifier">
+                {sanitizeText(displayValue) || <span style={{ color: 'var(--color-text-faint)' }}>-</span>}
+            </td>
+        );
+    };
+
+    const schoolStats = useMemo(() => ({
+        total: students.length,
+        found: students.filter((s) => s.stage_status === 'found').length,
+        searching: students.filter((s) => s.stage_status !== 'found').length,
+    }), [students]);
+
+    return (
+        <section className="fade-in">
+            <div className="page-title-group">
+                <h1 className="page-title">Suivi des etudiants</h1>
+                <p className="page-subtitle">Gerez et suivez l'avancement de vos promotions</p>
+            </div>
+
+            {!loading && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+                    <div className="flex-center" style={{ gap: 8 }}>
+                        <button className={`filter-pill${stageFilter === 'all' ? ' active' : ''}`} onClick={() => setStageFilter('all')}>
+                            Tous <span className="filter-count">{schoolStats.total}</span>
+                        </button>
+                        <button className={`filter-pill green${stageFilter === 'found' ? ' active' : ''}`} onClick={() => setStageFilter('found')}>
+                            Stage obtenu <span className="filter-count">{schoolStats.found}</span>
+                        </button>
+                        <button className={`filter-pill orange${stageFilter === 'searching' ? ' active' : ''}`} onClick={() => setStageFilter('searching')}>
+                            En recherche <span className="filter-count">{schoolStats.searching}</span>
+                        </button>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        <input type="file" accept=".csv" ref={csvInputRef} onChange={handleCsvImport} style={{ display: 'none' }} />
+                        <button className="btn btn-outline btn-sm" onClick={() => csvInputRef.current?.click()} disabled={importing} title="Importer des etudiants depuis un fichier CSV">
+                            {importing ? 'Import...' : '⬆ Importer CSV'}
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            <div className="tabs" style={{ marginBottom: 0 }} role="tablist" aria-label="Ecoles">
+                {schools.map((s) => (
+                    renamingTab === s.id ? (
+                        <div key={s.id} style={{ display: 'inline-flex', alignItems: 'center', padding: '4px 8px', marginBottom: -1 }}>
+                            <input
+                                className="input"
+                                style={{ padding: '4px 8px', fontSize: 13, width: 120 }}
+                                value={renameValue}
+                                onChange={(e) => setRenameValue(e.target.value)}
+                                onBlur={() => saveRename(s.id)}
+                                onKeyDown={(e) => { if (e.key === 'Enter') saveRename(s.id); if (e.key === 'Escape') setRenamingTab(null); }}
+                                autoFocus
+                                maxLength={100}
+                                aria-label="Renommer l'ecole"
+                            />
+                        </div>
+                    ) : (
+                        <button
+                            key={s.id}
+                            className={`tab${activeSchool === s.id ? ' active' : ''}`}
+                            role="tab"
+                            aria-selected={activeSchool === s.id}
+                            onClick={() => setActiveSchool(s.id)}
+                            onDoubleClick={() => handleTabDoubleClick(s)}
+                            title="Double-cliquer pour renommer"
+                        >
+                            {sanitizeText(s.name || s.nom)}
+                        </button>
+                    )
+                ))}
+                {showAddSchool ? (
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 8px', marginBottom: -1 }}>
+                        <input
+                            className="input"
+                            style={{ padding: '4px 8px', fontSize: 13, width: 120 }}
+                            value={newSchoolName}
+                            onChange={(e) => setNewSchoolName(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') addSchool(); if (e.key === 'Escape') setShowAddSchool(false); }}
+                            placeholder="Nom de l'ecole"
+                            autoFocus
+                            maxLength={100}
+                            aria-label="Nom de la nouvelle ecole"
+                        />
+                        <button className="btn btn-primary btn-sm" style={{ padding: '4px 8px' }} onClick={addSchool}>OK</button>
+                    </div>
+                ) : (
+                    <button className="tab-add" onClick={() => setShowAddSchool(true)} title="Ajouter une ecole" aria-label="Ajouter une ecole">+</button>
+                )}
+            </div>
+
+            {loading ? <Spinner /> : (
+                <div className="spreadsheet-container" style={{ marginTop: 0 }}>
+                    <table className="spreadsheet">
+                        <thead>
+                            <tr>
+                                {[
+                                    { key: 'last_name', label: 'Nom' },
+                                    { key: 'first_name', label: 'Prenom' },
+                                    { key: 'promo', label: 'Promotion' },
+                                    { key: null, label: 'CV' },
+                                    { key: 'sector', label: 'Secteur' },
+                                    { key: 'stage_status', label: 'Stage obtenu' },
+                                    { key: null, label: 'Entreprise' },
+                                    { key: 'saved_jobs_count', label: 'Offres sauveg.' },
+                                    { key: 'applications_count', label: 'Candidatures' },
+                                    { key: null, label: 'Notes' },
+                                    { key: null, label: 'Chat' },
+                                ].map(({ key, label }) => {
+                                    if (!key) return <th key={label}>{label}</th>;
+                                    const idx = sortStack.findIndex((s) => s.key === key);
+                                    const isActive = idx !== -1;
+                                    const dir = isActive ? sortStack[idx].dir : null;
+                                    return (
+                                        <th key={key} className="sortable" onClick={() => handleSort(key)}>
+                                            {label}
+                                            {isActive ? (
+                                                <span className="sort-indicator active">
+                                                    {dir === 'asc' ? ' ↑' : ' ↓'}
+                                                    {idx > 0 && <span className="sort-rank">{idx + 1}</span>}
+                                                </span>
+                                            ) : <span className="sort-indicator"> ↕</span>}
+                                        </th>
+                                    );
+                                })}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filteredStudents.length > 0 ? filteredStudents.map((s) => (
+                                <tr key={s.id}>
+                                    {renderCell(s, 'last_name', s.last_name || s.nom || '')}
+                                    {renderCell(s, 'first_name', s.first_name || s.prenom || '')}
+                                    {renderCell(s, 'promo', s.promo || '')}
+                                    <td>
+                                        {s.has_cv ? (
+                                            <a href={`/api/admin/students/${s.id}/cv`} target="_blank" rel="noopener noreferrer" className="btn btn-outline btn-sm" style={{ padding: '3px 10px', fontSize: 12 }} aria-label="Voir le CV">
+                                                Voir
+                                            </a>
+                                        ) : <span style={{ color: 'var(--color-text-faint)' }}>--</span>}
+                                    </td>
+                                    {renderCell(s, 'sector', s.sector || s.secteur || '')}
+                                    {renderCell(s, 'stage_status', '')}
+                                    {renderCell(s, 'company', s.company || s.entreprise || '')}
+                                    <td style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>{s.saved_jobs_count ?? 0}</td>
+                                    <td style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>{s.applications_count ?? 0}</td>
+                                    {renderCell(s, 'notes', s.notes || '')}
+                                    <td style={{ textAlign: 'center' }}>
+                                        <button className="btn btn-outline btn-sm" style={{ padding: '4px 8px' }} onClick={() => openChatPage(s)} title="Ouvrir la messagerie" aria-label={`Messagerie avec ${sanitizeText(s.first_name || '')} ${sanitizeText(s.last_name || '')}`}>
+                                            Ouvrir
+                                        </button>
+                                    </td>
+                                </tr>
+                            )) : (
+                                <tr>
+                                    <td colSpan={11} style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: 48 }}>
+                                        {stageFilter !== 'all' ? 'Aucun etudiant ne correspond a ce filtre.' : 'Aucun etudiant inscrit dans cette ecole pour le moment.'}
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        </section>
+    );
+}
+
+/* ===== Admin: Messages ===== */
+
+function AdminMessages({ toast, initialStudentId }) {
+    const [students, setStudents] = useState([]);
+    const [selectedId, setSelectedId] = useState(initialStudentId || null);
+    const [messages, setMessages] = useState([]);
+    const [loadingStudents, setLoadingStudents] = useState(true);
+    const [loadingMessages, setLoadingMessages] = useState(false);
+    const [text, setText] = useState('');
+    const [sending, setSending] = useState(false);
+    const chatBodyRef = useRef(null);
+
+    useEffect(() => {
+        api('/api/admin/students')
+            .then((d) => {
+                const list = Array.isArray(d) ? d : d.students || [];
+                setStudents(list);
+                if (!selectedId && list.length > 0) setSelectedId(list[0].id);
+            })
+            .catch((err) => toast(err.message, 'error'))
+            .finally(() => setLoadingStudents(false));
+    }, []);
+
+    const fetchMessages = useCallback((sid) => {
+        if (!sid) return;
+        setLoadingMessages(true);
+        api(`/api/admin/messages/${sid}`)
+            .then((d) => setMessages(Array.isArray(d) ? d : d.messages || []))
+            .catch((err) => toast(err.message, 'error'))
+            .finally(() => setLoadingMessages(false));
+    }, [toast]);
+
+    useEffect(() => { if (selectedId) fetchMessages(selectedId); }, [selectedId, fetchMessages]);
+
+    useEffect(() => {
+        if (chatBodyRef.current) {
+            chatBodyRef.current.scrollTop = chatBodyRef.current.scrollHeight;
+        }
+    }, [messages]);
+
+    const sendMessage = useCallback(async () => {
+        if (!text.trim() || !selectedId) return;
+        setSending(true);
+        try {
+            await api('/api/admin/messages', {
+                method: 'POST',
+                body: JSON.stringify({ to_student_id: selectedId, content: text }),
+            });
+            setText('');
+            fetchMessages(selectedId);
+        } catch (err) {
+            toast(err.message, 'error');
+        } finally {
+            setSending(false);
+        }
+    }, [text, selectedId, toast, fetchMessages]);
+
+    const handleKeyDown = useCallback((e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    }, [sendMessage]);
+
+    const selectedStudent = useMemo(
+        () => students.find((s) => s.id === selectedId),
+        [students, selectedId]
+    );
+
+    return (
+        <section className="fade-in">
+            <div className="page-title-group">
+                <h1 className="page-title">Messagerie</h1>
+                <p className="page-subtitle">Communiquez avec vos etudiants</p>
+            </div>
+            <div className="messaging-layout">
+                <nav className="msg-contacts" aria-label="Liste des etudiants">
+                    {loadingStudents ? <Spinner /> : (
+                        students.map((s) => (
+                            <div
+                                key={s.id}
+                                className={`msg-contact${selectedId === s.id ? ' active' : ''}`}
+                                role="button"
+                                tabIndex={0}
+                                onClick={() => setSelectedId(s.id)}
+                                onKeyDown={(e) => e.key === 'Enter' && setSelectedId(s.id)}
+                                aria-label={`${sanitizeText(s.first_name || '')} ${sanitizeText(s.last_name || '')}`}
+                            >
+                                <div className="msg-contact-avatar" aria-hidden="true">
+                                    {(s.first_name || '?')[0]}{(s.last_name || '?')[0]}
+                                </div>
+                                <div className="msg-contact-info">
+                                    <div className="msg-contact-name">{sanitizeText(s.first_name || '')} {sanitizeText(s.last_name || '')}</div>
+                                    <div className="msg-contact-preview">{sanitizeText(s.email || '')}</div>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </nav>
+                <div className="msg-chat">
+                    {selectedStudent ? (
+                        <>
+                            <div className="msg-chat-header">{sanitizeText(selectedStudent.first_name || '')} {sanitizeText(selectedStudent.last_name || '')}</div>
+                            <div className="msg-chat-body" ref={chatBodyRef}>
+                                {loadingMessages ? <Spinner /> : (
+                                    messages.length > 0 ? messages.map((m, i) => (
+                                        <div key={m.id || i} className={`msg-bubble ${m.from_admin ? 'sent' : 'received'}`}>
+                                            <div>{sanitizeText(m.content || m.message || m.text)}</div>
+                                            <div className="msg-bubble-time">{relativeTime(m.sent_at || m.created_at || m.date)}</div>
+                                        </div>
+                                    )) : <div className="msg-empty">Aucun message. Envoyez le premier message a cet etudiant.</div>
+                                )}
+                            </div>
+                            <div className="msg-input-area">
+                                <input
+                                    className="input"
+                                    type="text"
+                                    value={text}
+                                    onChange={(e) => setText(e.target.value)}
+                                    placeholder="Ecrire un message..."
+                                    onKeyDown={handleKeyDown}
+                                    maxLength={2000}
+                                    aria-label="Message"
+                                />
+                                <button className="btn btn-primary btn-sm" onClick={sendMessage} disabled={sending || !text.trim()}>
+                                    {sending ? '...' : 'Envoyer'}
+                                </button>
+                            </div>
+                        </>
+                    ) : (
+                        <div className="msg-empty">Selectionnez un etudiant pour demarrer la conversation.</div>
+                    )}
+                </div>
+            </div>
+        </section>
+    );
+}
+
+/* ===== Main App ===== */
+
+function App() {
+    const [user, setUser] = useState(getUserData);
+    const [toasts, setToasts] = useState([]);
+    const [page, setPage] = useState('dashboard');
+    const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [unreadCount, setUnreadCount] = useState(0);
+    const [chatStudentId, setChatStudentId] = useState(null);
+
+    const toast = useCallback((msg, type = 'success') => {
+        const id = Date.now();
+        setToasts((prev) => [...prev, { id, msg, type }]);
+        setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3500);
+    }, []);
+
+    useEffect(() => {
+        if (!user || user.role === 'admin') return;
+        const fetchUnread = () => {
+            api('/api/student/messages/unread-count')
+                .then((d) => setUnreadCount(typeof d === 'number' ? d : d.count || 0))
+                .catch(() => {});
+        };
+        fetchUnread();
+        const interval = setInterval(fetchUnread, 30000);
+        return () => clearInterval(interval);
+    }, [user]);
+
+    const handleLogin = useCallback((userData) => {
+        setUser(userData);
+        setPage('dashboard');
+    }, []);
+
+    const handleLogout = useCallback(() => {
+        clearAuth();
+        setUser(null);
+        setPage('dashboard');
+    }, []);
+
+    const closeSidebar = useCallback(() => setSidebarOpen(false), []);
+    const toggleSidebar = useCallback(() => setSidebarOpen((prev) => !prev), []);
+
+    if (!user) {
+        return (
+            <>
+                <ToastContainer toasts={toasts} />
+                <LoginPage onLogin={handleLogin} toast={toast} />
+            </>
+        );
+    }
+
+    const isAdmin = user.role === 'admin';
+
+    const studentNav = [
+        { id: 'dashboard', label: 'Tableau de bord', icon: <Icon.Dashboard /> },
+        { id: 'offres', label: 'Offres de stage', icon: <Icon.Search /> },
+        { id: 'suivi', label: 'Mes candidatures', icon: <Icon.ClipboardList /> },
+        { id: 'messages', label: 'Messages', icon: <Icon.Message />, badge: unreadCount },
+        { id: 'profil', label: 'Mon profil', icon: <Icon.User /> },
+    ];
+    const adminNav = [
+        { id: 'dashboard', label: 'Tableau de bord', icon: <Icon.Dashboard /> },
+        { id: 'search', label: 'Recherche de stages', icon: <Icon.Search /> },
+        { id: 'students', label: 'Suivi des etudiants', icon: <Icon.Users /> },
+        { id: 'messages', label: 'Messagerie', icon: <Icon.Message /> },
+    ];
+    const navItems = isAdmin ? adminNav : studentNav;
+
+    const renderPage = () => {
+        if (isAdmin) {
+            switch (page) {
+                case 'search': return <AdminSearch toast={toast} />;
+                case 'students': return <AdminStudents toast={toast} setPage={setPage} setChatStudentId={setChatStudentId} />;
+                case 'messages': return <AdminMessages toast={toast} initialStudentId={chatStudentId} />;
+                default: return <AdminDashboard toast={toast} setPage={setPage} />;
+            }
+        }
+        switch (page) {
+            case 'offres': return <StudentOffres toast={toast} />;
+            case 'suivi': return <StudentSuivi toast={toast} />;
+            case 'messages': return <StudentMessages toast={toast} />;
+            case 'profil': return <StudentProfil user={user} toast={toast} />;
+            default: return <StudentDashboard user={user} toast={toast} />;
+        }
+    };
+
+    return (
+        <div className="app-layout">
+            <ToastContainer toasts={toasts} />
+
+            {/* Mobile header */}
+            <header className="mobile-header">
+                <button className="hamburger" onClick={toggleSidebar} aria-label="Ouvrir le menu" aria-expanded={sidebarOpen}>
+                    <Icon.Menu />
+                </button>
+                <h1>ICART</h1>
+                <div style={{ width: 40 }} aria-hidden="true"></div>
+            </header>
+            <div className={`sidebar-overlay${sidebarOpen ? ' open' : ''}`} onClick={closeSidebar} aria-hidden="true"></div>
+
+            {/* Sidebar */}
+            <aside className={`sidebar${sidebarOpen ? ' open' : ''}`} aria-label="Navigation principale">
+                <div className="sidebar-logo">
+                    <h1>ICART</h1>
+                    <span>{isAdmin ? 'Relations Entreprises' : 'Espace Etudiant'}</span>
+                </div>
+                <nav className="sidebar-nav" aria-label="Menu principal">
+                    {navItems.map((item) => (
+                        <button
+                            key={item.id}
+                            className={`nav-item${page === item.id ? ' active' : ''}`}
+                            onClick={() => { setPage(item.id); closeSidebar(); }}
+                            aria-current={page === item.id ? 'page' : undefined}
+                        >
+                            {item.icon}
+                            <span style={{ flex: 1 }}>{item.label}</span>
+                            {item.badge > 0 && (
+                                <span className="nav-badge" aria-label={`${item.badge} non lus`}>{item.badge}</span>
+                            )}
+                        </button>
+                    ))}
+                </nav>
+                <div className="sidebar-footer">
+                    <button onClick={handleLogout} className="logout-link" aria-label="Se deconnecter">
+                        <Icon.Logout /> Se deconnecter
+                    </button>
+                    <span className="user-email" title={user.email}>{sanitizeText(user.email)}</span>
+                </div>
+            </aside>
+
+            {/* Main content */}
+            <main className="main-content">
+                {renderPage()}
+            </main>
+        </div>
+    );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

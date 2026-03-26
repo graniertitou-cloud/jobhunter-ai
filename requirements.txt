@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+python-dotenv
+openai
+requests
+beautifulsoup4
+bcrypt
+slowapi
+pdfplumber
+ddgs
+openpyxl
+reportlab
+apscheduler
