@@ -2645,7 +2645,7 @@ function AdminStudents({ toast, setPage, setChatStudentId }) {
                                     { key: 'first_name', label: 'Prenom' },
                                     { key: 'promo', label: 'Promotion' },
                                     { key: null, label: 'CV' },
-                                    { key: 'sector', label: 'Secteur' },
+                                    { key: 'target_sector', label: 'Secteur' },
                                     { key: 'stage_status', label: 'Stage obtenu' },
                                     { key: null, label: 'Entreprise' },
                                     { key: 'saved_jobs_count', label: 'Offres sauveg.' },
@@ -2685,7 +2685,7 @@ function AdminStudents({ toast, setPage, setChatStudentId }) {
                                             </a>
                                         ) : <span style={{ color: 'var(--color-text-faint)' }}>--</span>}
                                     </td>
-                                    {renderCell(s, 'sector', s.sector || s.secteur || '')}
+                                    {renderCell(s, 'target_sector', s.target_sector || s.sector || '')}
                                     {renderCell(s, 'stage_status', '')}
                                     {renderCell(s, 'company', s.company || s.entreprise || '')}
                                     <td style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>{s.saved_jobs_count ?? 0}</td>
