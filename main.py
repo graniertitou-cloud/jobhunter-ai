@@ -192,46 +192,9 @@ class ScheduledFollowup(Base):
     sent = Column(Boolean, default=False)
 
 
-Base.metadata.create_all(engine)
-
-# --- Migration: add new columns if missing ---
-try:
-    from sqlalchemy import inspect as sa_inspect, text
-    inspector = sa_inspect(engine)
-    existing_cols = [c["name"] for c in inspector.get_columns("profiles")]
-    with engine.connect() as conn:
-        if "cvs_json" not in existing_cols:
-            conn.execute(text("ALTER TABLE profiles ADD COLUMN cvs_json TEXT DEFAULT '[]'"))
-        if "cover_letters_json" not in existing_cols:
-            conn.execute(text("ALTER TABLE profiles ADD COLUMN cover_letters_json TEXT DEFAULT '[]'"))
-        if "language" not in existing_cols:
-            conn.execute(text("ALTER TABLE profiles ADD COLUMN language VARCHAR DEFAULT 'fr'"))
-        if "alert_keywords" not in existing_cols:
-            conn.execute(text("ALTER TABLE profiles ADD COLUMN alert_keywords TEXT DEFAULT ''"))
-        if "alert_location" not in existing_cols:
-            conn.execute(text("ALTER TABLE profiles ADD COLUMN alert_location VARCHAR DEFAULT ''"))
-        if "smtp_email" not in existing_cols:
-            conn.execute(text("ALTER TABLE profiles ADD COLUMN smtp_email VARCHAR DEFAULT ''"))
-        if "smtp_password" not in existing_cols:
-            conn.execute(text("ALTER TABLE profiles ADD COLUMN smtp_password VARCHAR DEFAULT ''"))
-        if "smtp_host" not in existing_cols:
-            conn.execute(text("ALTER TABLE profiles ADD COLUMN smtp_host VARCHAR DEFAULT 'smtp.gmail.com'"))
-        if "smtp_port" not in existing_cols:
-            conn.execute(text("ALTER TABLE profiles ADD COLUMN smtp_port INTEGER DEFAULT 587"))
-        if "share_token" not in existing_cols:
-            conn.execute(text("ALTER TABLE profiles ADD COLUMN share_token VARCHAR"))
-        if "dark_mode" not in existing_cols:
-            conn.execute(text("ALTER TABLE profiles ADD COLUMN dark_mode BOOLEAN DEFAULT 0"))
-        conn.commit()
-    # Migration for users table
-    existing_user_cols = [c["name"] for c in inspector.get_columns("users")]
-    with engine.connect() as conn:
-        if "session_expires_at" not in existing_user_cols:
-            conn.execute(text("ALTER TABLE users ADD COLUMN session_expires_at DATETIME"))
-        conn.commit()
-    logger.info("Migration check done")
-except Exception as e:
-    logger.warning(f"Migration check: {e}")
+# Schema creation and migrations are now handled by Alembic.
+# See alembic/versions/ and the startup script (start.sh) which runs
+# `alembic upgrade head` (or stamps legacy databases) on every deploy.
 
 # --- FastAPI ---
 docs_url = "/docs" if os.getenv("DEBUG") else None
