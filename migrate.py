@@ -25,7 +25,7 @@ BASELINE_REVISION = "9e94c247962a"
 
 
 def main() -> None:
-    database_url = os.getenv("DATABASE_URL", "sqlite:///jobs.db")
+    database_url = os.getenv("DATABASE_URL") or os.getenv("DATABASE_PUBLIC_URL") or "sqlite:///jobs.db"
     if database_url.startswith("postgres://"):
         database_url = database_url.replace("postgres://", "postgresql://", 1)
 

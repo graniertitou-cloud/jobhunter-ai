@@ -13,8 +13,8 @@ from main import Base  # noqa: E402
 
 config = context.config
 
-# Override sqlalchemy.url with DATABASE_URL env var if present
-database_url = os.getenv("DATABASE_URL", "sqlite:///jobs.db")
+# Accept both DATABASE_URL and DATABASE_PUBLIC_URL (Railway-style naming)
+database_url = os.getenv("DATABASE_URL") or os.getenv("DATABASE_PUBLIC_URL") or "sqlite:///jobs.db"
 if database_url.startswith("postgres://"):
     database_url = database_url.replace("postgres://", "postgresql://", 1)
 config.set_main_option("sqlalchemy.url", database_url)
