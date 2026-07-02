@@ -44,6 +44,9 @@ h1,h2,h3,h4{font-family:var(--sans);font-weight:700;letter-spacing:-.02em}
 .nav-item:hover{color:var(--ink);background:rgba(33,29,21,0.03)}
 .nav-item.active{color:var(--ink);border-left-color:var(--accent);background:rgba(217,73,43,0.05)}
 .nav-item svg{width:16px;height:16px;flex-shrink:0}
+.nav-item.disabled{color:var(--faint);cursor:not-allowed;pointer-events:none;opacity:.5}
+.nav-item.disabled:hover{background:none;color:var(--faint)}
+.nav-soon-label{font:600 9px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--faint);padding:16px 24px 7px;margin-top:6px;border-top:1px solid var(--hair)}
 .sidebar-user{padding:16px 24px;border-top:1px solid var(--hair);display:flex;align-items:center;gap:10px}
 .sidebar-avatar{width:30px;height:30px;border-radius:50%;object-fit:cover}
 .sidebar-username{color:var(--ink);font-size:12px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -826,15 +829,16 @@ function App() {
     { key: 'dashboard', icon: Icon.Dashboard },
     { key: 'profile', icon: Icon.Profile },
     { key: 'search', icon: Icon.Search },
-    { key: 'cv-tailor', icon: Icon.FileEdit, label: 'cvTailor' },
     { key: 'human', icon: Icon.People },
-    { key: 'interview', icon: Icon.MessageCircle },
     { key: 'alerts', icon: Icon.Bell },
     { key: 'tracker', icon: Icon.Briefcase },
-    { key: 'letter', icon: Icon.Letter },
-    { key: 'email', icon: Icon.Mail, label: 'emailPage' },
     { key: 'analytics', icon: Icon.BarChart },
     { key: 'recap', icon: Icon.Recap },
+    // Fonctionnalites pas encore pretes : grisees, non cliquables, en bas.
+    { key: 'cv-tailor', icon: Icon.FileEdit, label: 'cvTailor', disabled: true },
+    { key: 'interview', icon: Icon.MessageCircle, disabled: true },
+    { key: 'email', icon: Icon.Mail, label: 'emailPage', disabled: true },
+    { key: 'letter', icon: Icon.Letter, disabled: true },
   ];
 
   return (
@@ -843,10 +847,16 @@ function App() {
       <div className={`sidebar ${menuOpen?'open':''}`}>
         <div className="sidebar-logo">JobHunter AI</div>
         <nav className="sidebar-nav">
-          {navItems.map(({ key, icon: Ic, label }) => (
+          {navItems.filter(n => !n.disabled).map(({ key, icon: Ic, label }) => (
             <div key={key} className={`nav-item ${page===key?'active':''}`} onClick={() => { setPage(key); setMenuOpen(false); if(key==='recap'||key==='dashboard'){loadStats();loadSaved();} }} style={{position:'relative'}}>
               <Ic />{t(label || key)}
               {key === 'alerts' && (stats.unseen_alerts || 0) > 0 && <span className="alert-badge">{stats.unseen_alerts}</span>}
+            </div>
+          ))}
+          <div className="nav-soon-label">Prochainement</div>
+          {navItems.filter(n => n.disabled).map(({ key, icon: Ic, label }) => (
+            <div key={key} className="nav-item disabled" title="Fonctionnalite bientot disponible" aria-disabled="true">
+              <Ic />{t(label || key)}
             </div>
           ))}
         </nav>
