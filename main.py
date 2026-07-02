@@ -482,6 +482,11 @@ def register(req: RegisterRequest, request: Request):
         raise HTTPException(400, "Le mot de passe doit contenir au moins 8 caractères")
     db = SessionLocal()
     try:
+        # Inscriptions fermees : seul le tout premier compte (bootstrap) peut etre cree.
+        # Une fois qu'un compte existe, personne d'autre ne peut s'inscrire.
+        # Reouverture ponctuelle possible avec la variable d'env ALLOW_REGISTRATION=1.
+        if os.getenv("ALLOW_REGISTRATION", "0") != "1" and db.query(User).count() > 0:
+            raise HTTPException(403, "Les inscriptions sont fermees.")
         existing = db.query(User).filter(User.email == req.email).first()
         if existing:
             raise HTTPException(400, "Cet email est déjà utilisé")
