@@ -584,7 +584,7 @@ def get_profile(request: Request):
             return {
                 "cv": "", "cover_letter": "", "goals": "", "cvs": [], "cover_letters": [],
                 "language": "fr", "alert_keywords": "", "alert_location": "",
-                "completion_score": 0, "completion_message": "Commencez par ajouter votre CV pour personnaliser votre experience.",
+                "completion_score": 0, "completion_message": "Commencez par ajouter votre CV pour personnaliser votre expérience.",
             }
         cvs = []
         cover_letters = []
@@ -628,7 +628,7 @@ def get_profile(request: Request):
         elif score >= 30:
             completion_msg = "Bon debut ! Completez votre profil pour obtenir de meilleurs resultats."
         else:
-            completion_msg = "Commencez par ajouter votre CV pour personnaliser votre experience."
+            completion_msg = "Commencez par ajouter votre CV pour personnaliser votre expérience."
 
         return {
             "cv": p.cv or "",
